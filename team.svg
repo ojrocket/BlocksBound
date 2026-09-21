@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="650" height="320" viewBox="0 0 650 320">
+  <rect width="100%" height="100%" fill="#050505" />
+  
+  <style>
+    @keyframes typewriter {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    @keyframes flicker {
+      0% { opacity: 0.8; }
+      5% { opacity: 0.2; }
+      10% { opacity: 0.9; }
+      15% { opacity: 0.3; }
+      20% { opacity: 1; }
+      100% { opacity: 1; }
+    }
+    .mono { font-family: 'Courier New', Courier, monospace; text-transform: uppercase; }
+    .header { fill: #ff0000; font-size: 18px; font-weight: bold; animation: flicker 3s infinite; }
+    .label { fill: #555; font-size: 10px; letter-spacing: 2px; }
+    .name { fill: #eee; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; }
+    .role { fill: #888; font-size: 12px; }
+    .status { fill: #ff0000; font-size: 10px; font-weight: bold; animation: blink 1s step-end infinite; }
+    .reveal { opacity: 0; animation: fadeIn 0.3s forwards; }
+    @keyframes fadeIn { to { opacity: 1; } }
+  </style>
+
+  <!-- Background Grid -->
+  <path d="M 0 40 L 650 40 M 0 280 L 650 280 M 40 0 L 40 320" stroke="#111" stroke-width="1" />
+
+  <!-- Top Secret Stamp -->
+  <rect x="500" y="20" width="120" height="40" fill="none" stroke="#ff0000" stroke-width="2" opacity="0.3" transform="rotate(-15, 560, 40)" />
+  <text x="515" y="47" class="mono" fill="#ff0000" font-size="14" opacity="0.3" transform="rotate(-15, 560, 40)">CLASSIFIED</text>
+
+  <!-- Header -->
+  <text x="60" y="35" class="mono header">IMF // OPERATIONAL_ROSTER: BLOCKSBOUND</text>
+
+  <!-- Agent 01 -->
+  <g class="reveal" style="animation-delay: 0.2s">
+    <text x="60" y="85" class="mono label">AGENT_ID: 01</text>
+    <text x="60" y="105" class="mono name">JASHWANTH</text>
+    <text x="250" y="105" class="mono role">// LEAD_DEVELOPER_ENGINE</text>
+    <text x="550" y="105" class="mono status">[ACTIVE]</text>
+  </g>
+
+  <!-- Agent 02 -->
+  <g class="reveal" style="animation-delay: 0.4s">
+    <text x="60" y="125" class="mono label">AGENT_ID: 02</text>
+    <text x="60" y="145" class="mono name">MOXIT AKASH</text>
+    <text x="250" y="145" class="mono role">// WORLD_GENERATION</text>
+    <text x="550" y="145" class="mono status">[ACTIVE]</text>
+  </g>
+
+  <!-- Agent 03 -->
+  <g class="reveal" style="animation-delay: 0.6s">
+    <text x="60" y="165" class="mono label">AGENT_ID: 03</text>
+    <text x="60" y="185" class="mono name">YASHWANTH</text>
+    <text x="250" y="185" class="mono role">// PLAYER_ENTITIES</text>
+    <text x="550" y="185" class="mono status">[ACTIVE]</text>
+  </g>
+
+  <!-- Agent 04 -->
+  <g class="reveal" style="animation-delay: 0.8s">
+    <text x="60" y="205" class="mono label">AGENT_ID: 04</text>
+    <text x="60" y="225" class="mono name">SRIKAR</text>
+    <text x="250" y="225" class="mono role">// GAMEPLAY_SYSTEMS</text>
+    <text x="550" y="225" class="mono status">[ACTIVE]</text>
+  </g>
+
+  <!-- Agent 05 -->
+  <g class="reveal" style="animation-delay: 1.0s">
+    <text x="60" y="245" class="mono label">AGENT_ID: 05</text>
+    <text x="60" y="265" class="mono name">PREM KUMAR</text>
+    <text x="250" y="265" class="mono role">// UI_AUDIO_PERSISTENCE</text>
+    <text x="550" y="265" class="mono status">[ACTIVE]</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="60" y="305" class="mono label" style="fill:#333">SECURE_LINE_ESTABLISHED // ENCRYPTION: RSA_4096</text>
+  <circle cx="50" cy="301" r="3" fill="#ff0000" animation="blink 0.5s infinite" />
+</svg>

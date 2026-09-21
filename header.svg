@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="300" viewBox="0 0 800 300">
+  <defs>
+    <!-- Pixelated Grass Pattern -->
+    <pattern id="grass" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#4d9043"/>
+      <rect width="20" height="20" fill="#5fb453"/>
+      <rect x="20" y="20" width="20" height="20" fill="#5fb453"/>
+    </pattern>
+    
+    <!-- Shadow Filter for Depth -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset result="offOut" in="SourceAlpha" dx="4" dy="4" />
+      <feColorMatrix result="matrixOut" in="offOut" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0" />
+      <feBlend in="SourceGraphic" in2="matrixOut" mode="normal" />
+    </filter>
+  </defs>
+
+  <style>
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(5px, -15px); }
+    }
+    .title-text {
+      fill: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: 900;
+      font-size: 64px;
+      text-transform: uppercase;
+      text-anchor: middle;
+      filter: url(#shadow);
+    }
+    .subtitle {
+      fill: #ffff55;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 18px;
+      text-anchor: middle;
+      font-weight: bold;
+    }
+    .player { animation: bob 2s ease-in-out infinite; }
+    .block { animation: float 4s ease-in-out infinite; }
+  </style>
+
+  <!-- Sky and Ground -->
+  <rect width="800" height="220" fill="#74b9ff"/>
+  <rect y="220" width="800" height="80" fill="url(#grass)"/>
+  <rect y="220" width="800" height="4" fill="#3d7036"/>
+
+  <!-- Background Voxel Blocks -->
+  <g class="block" style="animation-delay: 0s">
+    <rect x="100" y="150" width="30" height="30" fill="#8b4513" stroke="#5d2e0d" stroke-width="2"/>
+    <rect x="100" y="150" width="30" height="8" fill="#5fb453"/>
+  </g>
+  <g class="block" style="animation-delay: 1.5s">
+    <rect x="650" y="100" width="25" height="25" fill="#d2dae2" stroke="#808e9b" stroke-width="2"/>
+  </g>
+
+  <!-- Player Silhouette (Steve Style) -->
+  <g class="player" transform="translate(150, 160)">
+    <!-- Head -->
+    <rect x="0" y="0" width="24" height="24" fill="#ffdbac"/>
+    <!-- Body -->
+    <rect x="-4" y="24" width="32" height="36" fill="#00a8ff"/>
+    <!-- Legs -->
+    <rect x="-4" y="60" width="14" height="20" fill="#3d3d3d"/>
+    <rect x="14" y="60" width="14" height="20" fill="#3d3d3d"/>
+  </g>
+
+  <!-- Centered Title -->
+  <text x="50%" y="140" class="title-text">BLOCKSBOUND</text>
+  <text x="50%" y="175" class="subtitle">Custom Java Voxel Engine</text>
+
+  <!-- Status Indicator -->
+  <g transform="translate(325, 200)">
+    <rect width="150" height="24" rx="4" fill="#000000" opacity="0.6"/>
+    <text x="75" y="16" font-family="monospace" font-size="12" fill="#00ff00" text-anchor="middle">BUILD: SUCCESSFUL</text>
+  </g>
+</svg>
