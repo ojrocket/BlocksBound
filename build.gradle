@@ -1,0 +1,63 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.blocksbound'
+version = '0.1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+}
+
+def lwjglVersion = '3.3.4'
+
+def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+def platformName = 'linux'
+def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+
+if (osName.contains('win')) {
+    platformName = 'windows'
+} else if (osName.contains('mac')) {
+    platformName = 'macos'
+}
+
+if (arch.contains('aarch64') || arch.contains('arm64')) {
+    if (platformName == 'windows' || platformName == 'linux' || platformName == 'macos') {
+        platformName += '-arm64'
+    }
+}
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-stb'
+    implementation 'org.joml:joml:1.10.8'
+
+    runtimeOnly "org.lwjgl:lwjgl::natives-$platformName"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::natives-$platformName"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::natives-$platformName"
+    runtimeOnly "org.lwjgl:lwjgl-stb::natives-$platformName"
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+application {
+    mainClass = 'com.blocksbound.game.Main'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
