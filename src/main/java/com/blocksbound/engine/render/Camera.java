@@ -40,9 +40,9 @@ public class Camera {
     }
 
     public void updateDirection() {
-        front.x = (float) (Math.cos(Math.toRadians(pitch)) * Math.sin(Math.toRadians(yaw)));
+        front.x = (float) (Math.cos(Math.toRadians(pitch)) * Math.cos(Math.toRadians(yaw)));
         front.y = (float) Math.sin(Math.toRadians(pitch));
-        front.z = (float) (-Math.cos(Math.toRadians(pitch)) * Math.cos(Math.toRadians(yaw)));
+        front.z = (float) (Math.cos(Math.toRadians(pitch)) * Math.sin(Math.toRadians(yaw)));
         front.normalize();
     }
 }
