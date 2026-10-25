@@ -96,6 +96,10 @@ public class Window implements AutoCloseable {
         GLFW.glfwSetWindowShouldClose(handle, shouldClose);
     }
 
+    public void setTitle(String title) {
+        GLFW.glfwSetWindowTitle(handle, title);
+    }
+
     @Override
     public void close() {
         if (handle != 0L) {

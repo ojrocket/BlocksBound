@@ -19,4 +19,17 @@ public enum BlockType {
     public int getId() {
         return id;
     }
+
+    public boolean isSolid() {
+        return this != AIR && this != WATER;
+    }
+
+    public static BlockType fromId(int id) {
+        for (BlockType type : values()) {
+            if (type.id == id) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Unknown block id: " + id);
+    }
 }

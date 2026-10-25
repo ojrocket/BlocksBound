@@ -32,10 +32,14 @@ public class Engine {
             double deltaSeconds = time.update();
             accumulator += deltaSeconds;
             window.pollEvents();
-            input.beginFrame();
 
+            boolean inputConsumed = false;
             while (accumulator >= fixedStep) {
                 game.update((float) fixedStep);
+                if (!inputConsumed) {
+                    input.endFrame();
+                    inputConsumed = true;
+                }
                 accumulator -= fixedStep;
             }
 

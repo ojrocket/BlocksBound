@@ -1,42 +1,70 @@
 package com.blocksbound.engine.world;
 
-public class Chunk {
-    private static final int SIZE = 16;
-    private final short[] blocks = new short[SIZE * SIZE * SIZE];
+import java.util.Arrays;
 
-    public Chunk() {
-        for (int x = 0; x < SIZE; x++) {
-            for (int z = 0; z < SIZE; z++) {
-                for (int y = 0; y < SIZE; y++) {
-                    if (y == 0) {
-                        setBlock(x, y, z, BlockType.STONE.getId());
-                    } else if (y == 1) {
-                        setBlock(x, y, z, BlockType.DIRT.getId());
-                    }
-                }
-            }
-        }
-    }
+public class Chunk {
+    public static final int SIZE = 16;
+    public static final int HEIGHT = 64;
+    private static final int BLOCK_COUNT = SIZE * SIZE * HEIGHT;
+
+    private final short[] blocks = new short[BLOCK_COUNT];
+    private boolean dirty = true;
 
     public static int getSize() {
         return SIZE;
     }
 
+    public static int getHeight() {
+        return HEIGHT;
+    }
+
     public int getBlock(int x, int y, int z) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || z < 0 || z >= SIZE) {
-            return 0;
+        if (!contains(x, y, z)) {
+            return BlockType.AIR.getId();
         }
         return blocks[index(x, y, z)] & 0xFFFF;
     }
 
     public void setBlock(int x, int y, int z, int value) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || z < 0 || z >= SIZE) {
+        if (!contains(x, y, z)) {
             return;
         }
-        blocks[index(x, y, z)] = (short) value;
+        int index = index(x, y, z);
+        if ((blocks[index] & 0xFFFF) != value) {
+            blocks[index] = (short) value;
+            dirty = true;
+        }
     }
 
-    private int index(int x, int y, int z) {
-        return x + (z * SIZE) + (y * SIZE * SIZE);
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void markClean() {
+        dirty = false;
+    }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
+    public short[] copyBlocks() {
+        return Arrays.copyOf(blocks, blocks.length);
+    }
+
+    public void loadBlocks(short[] savedBlocks) {
+        if (savedBlocks.length != BLOCK_COUNT) {
+            throw new IllegalArgumentException("Unexpected block count for chunk");
+        }
+        System.arraycopy(savedBlocks, 0, blocks, 0, blocks.length);
+        dirty = true;
+    }
+
+    private static boolean contains(int x, int y, int z) {
+        return x >= 0 && x < SIZE && y >= 0 && y < HEIGHT && z >= 0 && z < SIZE;
+    }
+
+    private static int index(int x, int y, int z) {
+        return x + z * SIZE + y * SIZE * SIZE;
     }
 }

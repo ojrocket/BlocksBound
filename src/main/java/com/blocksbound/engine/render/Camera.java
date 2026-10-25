@@ -13,7 +13,7 @@ public class Camera {
     public float pitch = 0.0f;
     public float fov = 70.0f;
     public float nearPlane = 0.1f;
-    public float farPlane = 100.0f;
+    public float farPlane = 180.0f;
 
     public void updateProjection(int width, int height) {
         projectionMatrix.identity().perspective((float) Math.toRadians(fov), (float) width / (float) height, nearPlane, farPlane);
