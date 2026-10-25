@@ -11,6 +11,7 @@ public class Player {
     private static final float EYE_HEIGHT = 1.62f;
     private static final float BODY_HEIGHT = 1.8f;
     private static final float RADIUS = 0.30f;
+    private static final float COLLISION_EPSILON = 0.01f;
     private static final float GRAVITY = 24.0f;
     private static final float JUMP_SPEED = 8.5f;
 
@@ -94,7 +95,7 @@ public class Player {
     public void setPosition(Vector3f newPosition) {
         position.set(newPosition);
         verticalVelocity = 0.0f;
-        grounded = false;
+        grounded = intersectsWorld(world, new Vector3f(position).add(0.0f, -COLLISION_EPSILON * 2.0f, 0.0f));
         camera.getPosition().set(position);
     }
 
@@ -122,14 +123,18 @@ public class Player {
     }
 
     private boolean intersectsWorld() {
+        return intersectsWorld(world, position);
+    }
+
+    static boolean intersectsWorld(World world, Vector3f position) {
         float feet = position.y - EYE_HEIGHT;
         float head = feet + BODY_HEIGHT;
-        int minX = (int) Math.floor(position.x - RADIUS);
-        int maxX = (int) Math.floor(position.x + RADIUS - 0.0001f);
-        int minY = (int) Math.floor(feet);
-        int maxY = (int) Math.floor(head - 0.0001f);
-        int minZ = (int) Math.floor(position.z - RADIUS);
-        int maxZ = (int) Math.floor(position.z + RADIUS - 0.0001f);
+        int minX = (int) Math.floor(position.x - RADIUS + COLLISION_EPSILON);
+        int maxX = (int) Math.floor(position.x + RADIUS - COLLISION_EPSILON);
+        int minY = (int) Math.floor(feet + COLLISION_EPSILON);
+        int maxY = (int) Math.floor(head - COLLISION_EPSILON);
+        int minZ = (int) Math.floor(position.z - RADIUS + COLLISION_EPSILON);
+        int maxZ = (int) Math.floor(position.z + RADIUS - COLLISION_EPSILON);
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {

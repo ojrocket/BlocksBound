@@ -74,7 +74,7 @@ The current build implements the first playable voxel-world loop:
 - Deterministic, seeded terrain generated into 16 × 64 × 16 chunks as the player explores.
 - Chunk meshes include only faces exposed to air or water; edits refresh the affected chunk meshes.
 - First-person WASD movement with mouse look, gravity, jumping, and block collision.
-- Aim at a block and use the left mouse button to break it or the right mouse button to place the selected block.
+- A centered crosshair and outline highlight the block being targeted; hold the left mouse button to break one block every 0.05 seconds, or use the right mouse button to place the selected block.
 - Number keys 1–6 select grass, dirt, stone, sand, wood, or leaves.
 - F5 saves the world and player position; F9 loads the save; Escape exits (and saves on shutdown).
 - Saves are stored locally at `.blocksbound/world.dat` under the user's home directory. This binary save is the current persistence implementation; JDBC/MySQL remains a future project goal.

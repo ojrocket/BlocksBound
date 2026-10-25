@@ -23,6 +23,7 @@ public class Main implements Game {
     private static final int LOAD_RADIUS = 5;
     private static final int RENDER_RADIUS = 4;
     private static final float REACH = 6.0f;
+    private static final float BLOCK_BREAK_INTERVAL = 0.05f;
 
     private final Engine engine;
     private final Camera camera;
@@ -31,6 +32,7 @@ public class Main implements Game {
     private final java.nio.file.Path savePath = WorldStorage.defaultSavePath();
     private World world;
     private Player player;
+    private final BlockBreakCooldown blockBreakCooldown = new BlockBreakCooldown(BLOCK_BREAK_INTERVAL);
     private int selectedBlock = BlockType.DIRT.getId();
     private int lastChunkX = Integer.MIN_VALUE;
     private int lastChunkZ = Integer.MIN_VALUE;
@@ -97,14 +99,15 @@ public class Main implements Game {
             lastChunkX = chunkX;
             lastChunkZ = chunkZ;
         }
-        updateBlocks();
+        updateBlocks(deltaSeconds);
     }
 
     @Override
     public void render() {
         int centerX = Math.floorDiv((int) Math.floor(camera.getPosition().x), Chunk.SIZE);
         int centerZ = Math.floorDiv((int) Math.floor(camera.getPosition().z), Chunk.SIZE);
-        renderer.renderWorld(world, centerX, centerZ, RENDER_RADIUS);
+        Optional<BlockHit> targetedBlock = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);
+        renderer.renderWorld(world, centerX, centerZ, RENDER_RADIUS, targetedBlock);
     }
 
     @Override
@@ -112,13 +115,16 @@ public class Main implements Game {
         saveWorld();
     }
 
-    private void updateBlocks() {
+    private void updateBlocks(float deltaSeconds) {
         Optional<BlockHit> hit = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);
         if (hit.isEmpty()) {
+            blockBreakCooldown.shouldBreak(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
+                    input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT), false, deltaSeconds);
             return;
         }
         BlockHit target = hit.get();
-        if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+        if (blockBreakCooldown.shouldBreak(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
+                input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT), true, deltaSeconds)) {
             world.setBlockAtWorld(target.x(), target.y(), target.z(), BlockType.AIR.getId());
         }
         if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_RIGHT)

@@ -11,11 +11,17 @@ public class Mesh implements AutoCloseable {
     private final int vaoId;
     private final int vboId;
     private final int vertexCount;
+    private final int primitive;
 
     public Mesh(float[] vertices) {
+        this(vertices, GL11.GL_TRIANGLES);
+    }
+
+    public Mesh(float[] vertices, int primitive) {
         if (vertices.length % STRIDE != 0) {
             throw new IllegalArgumentException("Vertex data must contain position and color values");
         }
+        this.primitive = primitive;
         vaoId = GL30.glGenVertexArrays();
         vboId = GL15.glGenBuffers();
 
@@ -34,7 +40,7 @@ public class Mesh implements AutoCloseable {
 
     public void render() {
         GL30.glBindVertexArray(vaoId);
-        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, vertexCount);
+        GL11.glDrawArrays(primitive, 0, vertexCount);
     }
 
     @Override
