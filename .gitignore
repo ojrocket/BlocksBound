@@ -5,3 +5,5 @@ build/
 out/
 .DS_Store
 Thumbs.db
+gradle-8.10/
+gradle-8.10-bin.zip
