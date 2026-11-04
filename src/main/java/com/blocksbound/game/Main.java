@@ -8,6 +8,7 @@ import com.blocksbound.engine.player.Player;
 import com.blocksbound.engine.render.Camera;
 import com.blocksbound.engine.render.Renderer;
 import com.blocksbound.engine.world.BlockHit;
+import com.blocksbound.engine.world.BlockDrop;
 import com.blocksbound.engine.world.BlockType;
 import com.blocksbound.engine.world.Chunk;
 import com.blocksbound.engine.world.Raycaster;
@@ -15,6 +16,7 @@ import com.blocksbound.engine.world.World;
 import com.blocksbound.engine.world.WorldStorage;
 import com.blocksbound.engine.world.WorldStorage.SavedWorld;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
@@ -23,7 +25,8 @@ public class Main implements Game {
     private static final int LOAD_RADIUS = 5;
     private static final int RENDER_RADIUS = 4;
     private static final float REACH = 6.0f;
-    private static final float BLOCK_BREAK_INTERVAL = 0.05f;
+    private static final float BLOCK_BREAK_DURATION = 0.5f;
+    private static final float DROP_PICKUP_RADIUS = 1.5f;
 
     private final Engine engine;
     private final Camera camera;
@@ -32,7 +35,7 @@ public class Main implements Game {
     private final java.nio.file.Path savePath = WorldStorage.defaultSavePath();
     private World world;
     private Player player;
-    private final BlockBreakCooldown blockBreakCooldown = new BlockBreakCooldown(BLOCK_BREAK_INTERVAL);
+    private final BlockBreakProgress blockBreakProgress = new BlockBreakProgress(BLOCK_BREAK_DURATION);
     private int selectedBlock = BlockType.DIRT.getId();
     private int lastChunkX = Integer.MIN_VALUE;
     private int lastChunkZ = Integer.MIN_VALUE;
@@ -59,6 +62,7 @@ public class Main implements Game {
                     (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
             player = new Player(world, camera, input);
             player.setPosition(saved.get().playerPosition());
+            saved.get().inventory().forEach(player::addToInventory);
         } else {
             world = new World();
             world.ensureChunksAround(0, 0, LOAD_RADIUS);
@@ -68,7 +72,7 @@ public class Main implements Game {
 
         input.setCursorMode(GLFW.GLFW_CURSOR_DISABLED);
         input.setCursorPosition(engine.getWindow().getWidth() / 2.0, engine.getWindow().getHeight() / 2.0);
-        engine.getWindow().setTitle("BlocksBound | WASD move, Space jump, LMB break, RMB place, F5 save, F9 load");
+        updateWindowTitle();
     }
 
     @Override
@@ -100,6 +104,7 @@ public class Main implements Game {
             lastChunkZ = chunkZ;
         }
         updateBlocks(deltaSeconds);
+        collectNearbyDrops();
     }
 
     @Override
@@ -107,7 +112,8 @@ public class Main implements Game {
         int centerX = Math.floorDiv((int) Math.floor(camera.getPosition().x), Chunk.SIZE);
         int centerZ = Math.floorDiv((int) Math.floor(camera.getPosition().z), Chunk.SIZE);
         Optional<BlockHit> targetedBlock = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);
-        renderer.renderWorld(world, centerX, centerZ, RENDER_RADIUS, targetedBlock);
+        renderer.renderWorld(world, centerX, centerZ, RENDER_RADIUS, targetedBlock,
+                blockBreakProgress.getProgress());
     }
 
     @Override
@@ -118,14 +124,13 @@ public class Main implements Game {
     private void updateBlocks(float deltaSeconds) {
         Optional<BlockHit> hit = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);
         if (hit.isEmpty()) {
-            blockBreakCooldown.shouldBreak(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
-                    input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT), false, deltaSeconds);
+            blockBreakProgress.update(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT), null, deltaSeconds);
             return;
         }
         BlockHit target = hit.get();
-        if (blockBreakCooldown.shouldBreak(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
-                input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT), true, deltaSeconds)) {
-            world.setBlockAtWorld(target.x(), target.y(), target.z(), BlockType.AIR.getId());
+        if (blockBreakProgress.update(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
+                target, deltaSeconds)) {
+            world.breakBlockAtWorld(target.x(), target.y(), target.z());
         }
         if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
                 && !player.occupiesBlock(target.previousX(), target.previousY(), target.previousZ())) {
@@ -136,14 +141,47 @@ public class Main implements Game {
     private void selectBlock(int key, BlockType type) {
         if (input.wasKeyPressed(key)) {
             selectedBlock = type.getId();
-            engine.getWindow().setTitle("BlocksBound | Selected " + type.name()
-                    + " | LMB break, RMB place, F5 save, F9 load");
+            updateWindowTitle();
         }
+    }
+
+    private void collectNearbyDrops() {
+        Vector3f position = player.getPosition();
+        List<BlockDrop> collected = world.collectDroppedBlocksNear(
+                position.x, position.y, position.z, DROP_PICKUP_RADIUS);
+        if (collected.isEmpty()) {
+            return;
+        }
+        for (BlockDrop drop : collected) {
+            player.addToInventory(drop.type(), 1);
+        }
+        updateWindowTitle();
+    }
+
+    private void updateWindowTitle() {
+        StringBuilder title = new StringBuilder("BlocksBound | Selected ")
+                .append(BlockType.fromId(selectedBlock).name()).append(" | Inventory: ");
+        boolean hasItems = false;
+        for (BlockType type : BlockType.values()) {
+            int count = player == null ? 0 : player.getInventoryCount(type);
+            if (count > 0) {
+                if (hasItems) {
+                    title.append(", ");
+                }
+                title.append(type.name()).append(" x").append(count);
+                hasItems = true;
+            }
+        }
+        if (!hasItems) {
+            title.append("empty");
+        }
+        title.append(" | WASD move, Space jump, LMB break, RMB place, F5 save, F9 load");
+        engine.getWindow().setTitle(title.toString());
     }
 
     private void saveWorld() {
         try {
-            WorldStorage.save(savePath, world, player.getPosition());
+            WorldStorage.save(savePath, world, player.getPosition(), player.getInventory());
             engine.getWindow().setTitle("BlocksBound | World saved");
         } catch (IOException exception) {
             System.err.println("Could not save world to " + savePath + ": " + exception.getMessage());
@@ -160,11 +198,12 @@ public class Main implements Game {
             world = saved.get().world();
             player = new Player(world, camera, input);
             player.setPosition(saved.get().playerPosition());
+            saved.get().inventory().forEach(player::addToInventory);
             lastChunkX = Integer.MIN_VALUE;
             lastChunkZ = Integer.MIN_VALUE;
             world.ensureChunksAround((int) Math.floor(saved.get().playerPosition().x),
                     (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
-            engine.getWindow().setTitle("BlocksBound | World loaded");
+            updateWindowTitle();
         } catch (IOException exception) {
             System.err.println("Could not load world from " + savePath + ": " + exception.getMessage());
             engine.getWindow().setTitle("BlocksBound | Load failed (see console)");

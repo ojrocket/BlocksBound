@@ -1,12 +1,17 @@
 package com.blocksbound.engine.world;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class World {
     private final Map<Long, Chunk> chunks = new HashMap<>();
+    private final List<BlockDrop> droppedBlocks = new ArrayList<>();
     private long seed;
 
     public World() {
@@ -32,6 +37,56 @@ public class World {
 
     public Collection<Map.Entry<Long, Chunk>> getLoadedChunks() {
         return Collections.unmodifiableCollection(chunks.entrySet());
+    }
+
+    public List<BlockDrop> getDroppedBlocks() {
+        return Collections.unmodifiableList(droppedBlocks);
+    }
+
+    public Optional<BlockType> breakBlockAtWorld(int worldX, int worldY, int worldZ) {
+        if (worldY < 0 || worldY >= Chunk.HEIGHT) {
+            return Optional.empty();
+        }
+        int blockId = getBlockAtWorld(worldX, worldY, worldZ);
+        if (blockId == BlockType.AIR.getId()) {
+            return Optional.empty();
+        }
+        BlockType type = BlockType.fromId(blockId);
+        if (!type.isSolid()) {
+            return Optional.empty();
+        }
+        setBlockAtWorld(worldX, worldY, worldZ, BlockType.AIR.getId());
+        droppedBlocks.add(new BlockDrop(type, worldX + 0.5f, worldY + 0.5f, worldZ + 0.5f));
+        return Optional.of(type);
+    }
+
+    public List<BlockDrop> collectDroppedBlocksNear(float x, float y, float z, float radius) {
+        if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)
+                || !Float.isFinite(radius) || radius < 0.0f) {
+            throw new IllegalArgumentException("Pickup position and radius must be finite and radius non-negative");
+        }
+        float radiusSquared = radius * radius;
+        List<BlockDrop> collected = new ArrayList<>();
+        Iterator<BlockDrop> iterator = droppedBlocks.iterator();
+        while (iterator.hasNext()) {
+            BlockDrop drop = iterator.next();
+            float dx = drop.x() - x;
+            float dy = drop.y() - y;
+            float dz = drop.z() - z;
+            if (dx * dx + dy * dy + dz * dz <= radiusSquared) {
+                collected.add(drop);
+                iterator.remove();
+            }
+        }
+        return collected;
+    }
+
+    public void addDroppedBlock(BlockDrop drop) {
+        if (drop == null || drop.type() == null || !drop.type().isSolid()
+                || !Float.isFinite(drop.x()) || !Float.isFinite(drop.y()) || !Float.isFinite(drop.z())) {
+            throw new IllegalArgumentException("Dropped block must have a solid type and finite position");
+        }
+        droppedBlocks.add(drop);
     }
 
     public void ensureChunksAround(int worldX, int worldZ, int radius) {

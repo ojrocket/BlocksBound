@@ -11,14 +11,17 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.joml.Vector3f;
 
 public final class WorldStorage {
     private static final int MAGIC = 0x42424C4B;
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final int MAX_CHUNKS = 100_000;
+    private static final int MAX_DROPS = 1_000_000;
 
     private WorldStorage() {
     }
@@ -28,6 +31,11 @@ public final class WorldStorage {
     }
 
     public static void save(Path path, World world, Vector3f playerPosition) throws IOException {
+        save(path, world, playerPosition, Map.of());
+    }
+
+    public static void save(Path path, World world, Vector3f playerPosition,
+            Map<BlockType, Integer> inventory) throws IOException {
         Path parent = path.toAbsolutePath().getParent();
         Files.createDirectories(parent);
         Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
@@ -51,6 +59,34 @@ public final class WorldStorage {
                         output.writeShort(block);
                     }
                 }
+                if (world.getDroppedBlocks().size() > MAX_DROPS) {
+                    throw new IOException("Too many dropped blocks to save");
+                }
+                output.writeInt(world.getDroppedBlocks().size());
+                for (BlockDrop drop : world.getDroppedBlocks()) {
+                    output.writeInt(drop.type().getId());
+                    output.writeFloat(drop.x());
+                    output.writeFloat(drop.y());
+                    output.writeFloat(drop.z());
+                }
+                int inventorySize = 0;
+                for (Map.Entry<BlockType, Integer> entry : inventory.entrySet()) {
+                    if (entry.getKey() == null || !entry.getKey().isSolid()
+                            || entry.getValue() == null || entry.getValue() < 0) {
+                        throw new IOException("Invalid inventory entry");
+                    }
+                    if (entry.getValue() > 0) {
+                        inventorySize++;
+                    }
+                }
+                output.writeInt(inventorySize);
+                for (Map.Entry<BlockType, Integer> entry : inventory.entrySet()) {
+                    if (entry.getValue() == 0) {
+                        continue;
+                    }
+                    output.writeInt(entry.getKey().getId());
+                    output.writeInt(entry.getValue());
+                }
             }
             try {
                 Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -72,7 +108,7 @@ public final class WorldStorage {
                 throw new IOException("Not a BlocksBound world save: " + path);
             }
             int version = input.readInt();
-            if (version != VERSION) {
+            if (version < 1 || version > VERSION) {
                 throw new IOException("Unsupported world save version: " + version);
             }
             long seed = input.readLong();
@@ -107,12 +143,57 @@ public final class WorldStorage {
                 }
                 world.putLoadedChunk(chunkX, chunkZ, chunk);
             }
-            return Optional.of(new SavedWorld(world, playerPosition));
+            Map<BlockType, Integer> inventory = new EnumMap<>(BlockType.class);
+            if (version >= 2) {
+                int dropCount = input.readInt();
+                if (dropCount < 0 || dropCount > MAX_DROPS) {
+                    throw new IOException("Invalid dropped block count in world save: " + dropCount);
+                }
+                for (int index = 0; index < dropCount; index++) {
+                    int blockId = input.readInt();
+                    BlockType type = readSolidBlockType(blockId);
+                    float x = input.readFloat();
+                    float y = input.readFloat();
+                    float z = input.readFloat();
+                    try {
+                        world.addDroppedBlock(new BlockDrop(type, x, y, z));
+                    } catch (IllegalArgumentException exception) {
+                        throw new IOException("Invalid dropped block in world save", exception);
+                    }
+                }
+                int inventorySize = input.readInt();
+                if (inventorySize < 0 || inventorySize > BlockType.values().length) {
+                    throw new IOException("Invalid inventory size in world save: " + inventorySize);
+                }
+                for (int index = 0; index < inventorySize; index++) {
+                    BlockType type = readSolidBlockType(input.readInt());
+                    int count = input.readInt();
+                    if (count <= 0 || inventory.putIfAbsent(type, count) != null) {
+                        throw new IOException("Invalid inventory entry in world save");
+                    }
+                }
+            }
+            return Optional.of(new SavedWorld(world, playerPosition, inventory));
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid world save: " + path, exception);
         }
     }
 
-    public record SavedWorld(World world, Vector3f playerPosition) {
+    private static BlockType readSolidBlockType(int blockId) throws IOException {
+        try {
+            BlockType type = BlockType.fromId(blockId);
+            if (!type.isSolid()) {
+                throw new IOException("Invalid non-solid block type in world save");
+            }
+            return type;
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Invalid block id in world save", exception);
+        }
+    }
+
+    public record SavedWorld(World world, Vector3f playerPosition, Map<BlockType, Integer> inventory) {
+        public SavedWorld {
+            inventory = Map.copyOf(inventory);
+        }
     }
 }

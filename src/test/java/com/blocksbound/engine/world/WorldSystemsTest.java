@@ -2,9 +2,11 @@ package com.blocksbound.engine.world;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.util.Map;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,6 +56,22 @@ class WorldSystemsTest {
     }
 
     @Test
+    void breakingBlocksDropsThemForNearbyPickup() {
+        World world = new World(12L);
+        world.setBlockAtWorld(2, 50, 0, BlockType.STONE.getId());
+
+        assertEquals(BlockType.STONE, world.breakBlockAtWorld(2, 50, 0).orElseThrow());
+        assertEquals(BlockType.AIR.getId(), world.getBlockAtWorld(2, 50, 0));
+        assertEquals(1, world.getDroppedBlocks().size());
+        assertTrue(world.collectDroppedBlocksNear(0.5f, 50.5f, 0.5f, 1.0f).isEmpty());
+
+        assertEquals(BlockType.STONE, world.collectDroppedBlocksNear(2.5f, 50.5f, 0.5f, 1.0f)
+                .get(0).type());
+        assertTrue(world.getDroppedBlocks().isEmpty());
+        assertTrue(world.breakBlockAtWorld(2, 50, 0).isEmpty());
+    }
+
+    @Test
     void raycasterReturnsTheTargetAndPlacementCell() {
         World world = new World(9L);
         world.setBlockAtWorld(2, 50, 0, BlockType.STONE.getId());
@@ -70,14 +88,18 @@ class WorldSystemsTest {
     void worldSaveRestoresSeedBlocksAndPlayerPosition() throws Exception {
         World world = new World(42L);
         world.setBlockAtWorld(-1, 40, 2, BlockType.LEAVES.getId());
+        world.addDroppedBlock(new BlockDrop(BlockType.SAND, 3.5f, 42.5f, -1.5f));
         Vector3f playerPosition = new Vector3f(-4.5f, 31.25f, 12.0f);
         Path saveFile = temporaryDirectory.resolve("world.dat");
 
-        WorldStorage.save(saveFile, world, playerPosition);
+        WorldStorage.save(saveFile, world, playerPosition, Map.of(BlockType.DIRT, 3));
         WorldStorage.SavedWorld loaded = WorldStorage.load(saveFile).orElseThrow();
 
         assertEquals(42L, loaded.world().getSeed());
         assertEquals(BlockType.LEAVES.getId(), loaded.world().getBlockAtWorld(-1, 40, 2));
+        assertEquals(new BlockDrop(BlockType.SAND, 3.5f, 42.5f, -1.5f),
+                loaded.world().getDroppedBlocks().get(0));
+        assertEquals(Map.of(BlockType.DIRT, 3), loaded.inventory());
         assertEquals(playerPosition, loaded.playerPosition());
     }
 }

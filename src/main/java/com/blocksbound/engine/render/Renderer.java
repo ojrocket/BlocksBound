@@ -5,7 +5,10 @@ import com.blocksbound.engine.window.Window;
 import com.blocksbound.engine.world.Chunk;
 import com.blocksbound.engine.world.ChunkMesher;
 import com.blocksbound.engine.world.BlockHit;
+import com.blocksbound.engine.world.BlockDrop;
+import com.blocksbound.engine.world.BlockType;
 import com.blocksbound.engine.world.World;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -19,13 +22,17 @@ public class Renderer {
     private final Camera camera = new Camera();
     private final Matrix4f modelMatrix = new Matrix4f();
     private final Map<Long, Mesh> chunkMeshes = new HashMap<>();
+    private final Map<BlockType, Mesh> droppedBlockMeshes = new EnumMap<>(BlockType.class);
     private Shader shader;
     private Mesh blockHighlight;
     private Mesh crosshair;
     private Mesh crosshairOutline;
+    private Mesh breakProgressBackground;
+    private Mesh breakProgressFill;
     private int projectionLocation;
     private int viewLocation;
     private int modelLocation;
+    private float breakProgress;
     private World renderedWorld;
 
     public Renderer(Window window) {
@@ -64,10 +71,19 @@ public class Renderer {
         viewLocation = shader.getUniformLocation("uView");
         modelLocation = shader.getUniformLocation("uModel");
         blockHighlight = new Mesh(createBlockOutline(), GL11.GL_LINES);
+        for (BlockType type : BlockType.values()) {
+            if (type.isSolid()) {
+                droppedBlockMeshes.put(type, new Mesh(ChunkMesher.buildBlockCube(type)));
+            }
+        }
         crosshairOutline = new Mesh(createCrosshair(0.015f, 0.004f, 0.025f, 0.0f, 0.0f, 0.0f),
                 GL11.GL_LINES);
         crosshair = new Mesh(createCrosshair(0.015f, 0.004f, 0.025f, 1.0f, 1.0f, 1.0f),
                 GL11.GL_LINES);
+        breakProgressBackground = new Mesh(createBar(-0.035f, -0.028f, 0.035f, -0.022f,
+                0.08f, 0.08f, 0.08f));
+        breakProgressFill = new Mesh(createBar(-0.035f, -0.028f, 0.035f, -0.022f,
+                0.35f, 0.9f, 0.3f));
     }
 
     public void render(Game game, float alpha) {
@@ -84,11 +100,12 @@ public class Renderer {
         GL20.glUniformMatrix4fv(projectionLocation, false, camera.getProjectionMatrix().get(new float[16]));
         GL20.glUniformMatrix4fv(viewLocation, false, camera.getViewMatrix().get(new float[16]));
         game.render();
-        renderCrosshair(width, height);
+        renderCrosshair(width, height, breakProgress);
     }
 
     public void renderWorld(World world, int centerChunkX, int centerChunkZ, int renderRadius,
-            Optional<BlockHit> highlightedBlock) {
+            Optional<BlockHit> highlightedBlock, float breakProgress) {
+        this.breakProgress = Math.max(0.0f, Math.min(1.0f, breakProgress));
         shader.use();
         if (renderedWorld != world) {
             for (Mesh mesh : chunkMeshes.values()) {
@@ -131,6 +148,18 @@ public class Renderer {
             GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
             mesh.render();
         }
+        for (BlockDrop drop : world.getDroppedBlocks()) {
+            int dropChunkX = Math.floorDiv((int) Math.floor(drop.x()), Chunk.SIZE);
+            int dropChunkZ = Math.floorDiv((int) Math.floor(drop.z()), Chunk.SIZE);
+            if (Math.abs(dropChunkX - centerChunkX) > renderRadius
+                    || Math.abs(dropChunkZ - centerChunkZ) > renderRadius) {
+                continue;
+            }
+            modelMatrix.identity().translation(drop.x() - 0.15f, drop.y() - 0.15f, drop.z() - 0.15f)
+                    .scale(0.3f);
+            GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+            droppedBlockMeshes.get(drop.type()).render();
+        }
         highlightedBlock.ifPresent(this::renderBlockHighlight);
     }
 
@@ -150,7 +179,7 @@ public class Renderer {
         GL11.glLineWidth(1.0f);
     }
 
-    private void renderCrosshair(int width, int height) {
+    private void renderCrosshair(int width, int height, float breakProgress) {
         shader.use();
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glDepthMask(false);
@@ -163,6 +192,16 @@ public class Renderer {
         GL11.glLineWidth(2.0f);
         crosshair.render();
         GL11.glLineWidth(1.0f);
+        if (breakProgress > 0.0f) {
+            modelMatrix.identity().scaling((float) height / width, 1.0f, 1.0f);
+            GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+            breakProgressBackground.render();
+            modelMatrix.identity()
+                    .translation(-0.035f * ((float) height / width) * (1.0f - breakProgress), 0.0f, 0.0f)
+                    .scaling((float) height / width * breakProgress, 1.0f, 1.0f);
+            GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+            breakProgressFill.render();
+        }
         GL11.glDepthMask(true);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
     }
@@ -216,11 +255,34 @@ public class Renderer {
         return vertices;
     }
 
+    private static float[] createBar(float left, float bottom, float right, float top,
+            float red, float green, float blue) {
+        float[] vertices = new float[6 * 6];
+        float[][] positions = {
+            {left, bottom}, {right, bottom}, {right, top},
+            {left, bottom}, {right, top}, {left, top}
+        };
+        for (int vertex = 0; vertex < positions.length; vertex++) {
+            int offset = vertex * 6;
+            vertices[offset] = positions[vertex][0];
+            vertices[offset + 1] = positions[vertex][1];
+            vertices[offset + 2] = 0.025f;
+            vertices[offset + 3] = red;
+            vertices[offset + 4] = green;
+            vertices[offset + 5] = blue;
+        }
+        return vertices;
+    }
+
     public void shutdown() {
         for (Mesh mesh : chunkMeshes.values()) {
             mesh.close();
         }
         chunkMeshes.clear();
+        for (Mesh mesh : droppedBlockMeshes.values()) {
+            mesh.close();
+        }
+        droppedBlockMeshes.clear();
         if (blockHighlight != null) {
             blockHighlight.close();
         }
@@ -229,6 +291,12 @@ public class Renderer {
         }
         if (crosshairOutline != null) {
             crosshairOutline.close();
+        }
+        if (breakProgressBackground != null) {
+            breakProgressBackground.close();
+        }
+        if (breakProgressFill != null) {
+            breakProgressFill.close();
         }
         if (shader != null) {
             shader.close();

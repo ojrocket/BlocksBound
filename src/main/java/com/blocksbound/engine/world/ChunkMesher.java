@@ -54,6 +54,27 @@ public final class ChunkMesher {
         return vertices.toArray();
     }
 
+    public static float[] buildBlockCube(BlockType type) {
+        if (type == null || !type.isSolid()) {
+            throw new IllegalArgumentException("A block cube requires a solid block type");
+        }
+        FloatBuilder vertices = new FloatBuilder();
+        float[] color = color(type);
+        face(vertices, color, 1.0f,
+                1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1);
+        face(vertices, color, 0.78f,
+                0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0);
+        face(vertices, color, 1.18f,
+                0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0);
+        face(vertices, color, 0.58f,
+                0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1);
+        face(vertices, color, 0.92f,
+                0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1);
+        face(vertices, color, 0.84f,
+                0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0);
+        return vertices.toArray();
+    }
+
     private static boolean isVisible(BlockType current, int neighborId) {
         if (neighborId == BlockType.AIR.getId()) {
             return true;

@@ -4,6 +4,9 @@ import com.blocksbound.engine.input.Input;
 import com.blocksbound.engine.render.Camera;
 import com.blocksbound.engine.world.BlockType;
 import com.blocksbound.engine.world.World;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 
@@ -19,6 +22,7 @@ public class Player {
     private final Camera camera;
     private final Input input;
     private final Vector3f position = new Vector3f();
+    private final Map<BlockType, Integer> inventory = new EnumMap<>(BlockType.class);
     private float verticalVelocity;
     private boolean grounded;
 
@@ -90,6 +94,21 @@ public class Player {
 
     public Vector3f getPosition() {
         return new Vector3f(position);
+    }
+
+    public void addToInventory(BlockType type, int amount) {
+        if (type == null || !type.isSolid() || amount <= 0) {
+            throw new IllegalArgumentException("Inventory additions require a solid block and positive amount");
+        }
+        inventory.merge(type, amount, Math::addExact);
+    }
+
+    public int getInventoryCount(BlockType type) {
+        return inventory.getOrDefault(type, 0);
+    }
+
+    public Map<BlockType, Integer> getInventory() {
+        return Collections.unmodifiableMap(new EnumMap<>(inventory));
     }
 
     public void setPosition(Vector3f newPosition) {
