@@ -13,6 +13,9 @@ public class Engine {
     private final Time time = new Time();
     private final Game game;
     private double accumulator;
+    private boolean gameInitializationAttempted;
+    private boolean rendererInitializationAttempted;
+    private boolean shutdown;
 
     public Engine(EngineConfig config, Game game) {
         this.config = config;
@@ -23,37 +26,70 @@ public class Engine {
     }
 
     public void start() {
-        game.init();
-        renderer.init();
-        GLFW.glfwSetWindowTitle(window.getHandle(), config.title());
-
-        double fixedStep = config.fixedDeltaSeconds();
-        while (!window.shouldClose()) {
-            double deltaSeconds = time.update();
-            accumulator += deltaSeconds;
-            window.pollEvents();
-
-            boolean inputConsumed = false;
-            while (accumulator >= fixedStep) {
-                game.update((float) fixedStep);
-                if (!inputConsumed) {
-                    input.endFrame();
-                    inputConsumed = true;
-                }
-                accumulator -= fixedStep;
-            }
-
-            renderer.render(game, (float) (accumulator / fixedStep));
-            window.swapBuffers();
+        if (shutdown) {
+            throw new IllegalStateException("Engine has already shut down");
         }
+        Throwable failure = null;
+        try {
+            gameInitializationAttempted = true;
+            game.init();
+            rendererInitializationAttempted = true;
+            renderer.init();
+            GLFW.glfwSetWindowTitle(window.getHandle(), config.title());
 
-        shutdown();
+            double fixedStep = config.fixedDeltaSeconds();
+            while (!window.shouldClose()) {
+                double deltaSeconds = time.update();
+                accumulator += deltaSeconds;
+                window.pollEvents();
+
+                boolean inputConsumed = false;
+                while (accumulator >= fixedStep) {
+                    game.update((float) fixedStep);
+                    if (!inputConsumed) {
+                        input.endFrame();
+                        inputConsumed = true;
+                    }
+                    accumulator -= fixedStep;
+                }
+
+                renderer.render(game, (float) (accumulator / fixedStep));
+                window.swapBuffers();
+            }
+        } catch (RuntimeException | Error exception) {
+            failure = exception;
+            throw exception;
+        } finally {
+            try {
+                shutdown();
+            } catch (RuntimeException | Error exception) {
+                if (failure != null) {
+                    failure.addSuppressed(exception);
+                } else {
+                    throw exception;
+                }
+            }
+        }
     }
 
     public void shutdown() {
-        game.shutdown();
-        renderer.shutdown();
-        window.close();
+        if (shutdown) {
+            return;
+        }
+        shutdown = true;
+        try {
+            if (gameInitializationAttempted) {
+                game.shutdown();
+            }
+        } finally {
+            try {
+                if (rendererInitializationAttempted) {
+                    renderer.shutdown();
+                }
+            } finally {
+                window.close();
+            }
+        }
     }
 
     public Window getWindow() {

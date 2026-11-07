@@ -18,17 +18,28 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 
 public class Renderer {
+    private static final int HOTBAR_SLOT_COUNT = 10;
+    private static final float HOTBAR_SLOT_SIZE = 0.105f;
+    private static final float HOTBAR_SLOT_GAP = 0.008f;
+    private static final float HOTBAR_BOTTOM = -0.94f;
+
     private final Window window;
     private final Camera camera = new Camera();
     private final Matrix4f modelMatrix = new Matrix4f();
     private final Map<Long, Mesh> chunkMeshes = new HashMap<>();
     private final Map<BlockType, Mesh> droppedBlockMeshes = new EnumMap<>(BlockType.class);
+    private final Map<Integer, Mesh> digitMeshes = new HashMap<>();
     private Shader shader;
     private Mesh blockHighlight;
     private Mesh crosshair;
     private Mesh crosshairOutline;
     private Mesh breakProgressBackground;
     private Mesh breakProgressFill;
+    private Mesh hotbarSlotBackground;
+    private Mesh hotbarSelection;
+    private BlockType[] hotbarBlocks = new BlockType[HOTBAR_SLOT_COUNT];
+    private int[] hotbarCounts = new int[HOTBAR_SLOT_COUNT];
+    private int selectedHotbarSlot;
     private int projectionLocation;
     private int viewLocation;
     private int modelLocation;
@@ -84,6 +95,12 @@ public class Renderer {
                 0.08f, 0.08f, 0.08f));
         breakProgressFill = new Mesh(createBar(-0.035f, -0.028f, 0.035f, -0.022f,
                 0.35f, 0.9f, 0.3f));
+        hotbarSlotBackground = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f,
+                0.12f, 0.12f, 0.12f));
+        hotbarSelection = new Mesh(createRectangleOutline(), GL11.GL_LINES);
+        for (int digit = 0; digit <= 9; digit++) {
+            digitMeshes.put(digit, new Mesh(createDigit(digit), GL11.GL_LINES));
+        }
     }
 
     public void render(Game game, float alpha) {
@@ -104,8 +121,16 @@ public class Renderer {
     }
 
     public void renderWorld(World world, int centerChunkX, int centerChunkZ, int renderRadius,
-            Optional<BlockHit> highlightedBlock, float breakProgress) {
+            Optional<BlockHit> highlightedBlock, float breakProgress, BlockType[] hotbarBlocks,
+            int[] hotbarCounts, int selectedHotbarSlot) {
+        if (hotbarBlocks.length != HOTBAR_SLOT_COUNT || hotbarCounts.length != HOTBAR_SLOT_COUNT
+                || selectedHotbarSlot < 0 || selectedHotbarSlot >= HOTBAR_SLOT_COUNT) {
+            throw new IllegalArgumentException("Hotbar must contain ten slots and a valid selection");
+        }
         this.breakProgress = Math.max(0.0f, Math.min(1.0f, breakProgress));
+        this.hotbarBlocks = hotbarBlocks.clone();
+        this.hotbarCounts = hotbarCounts.clone();
+        this.selectedHotbarSlot = selectedHotbarSlot;
         shader.use();
         if (renderedWorld != world) {
             for (Mesh mesh : chunkMeshes.values()) {
@@ -202,8 +227,74 @@ public class Renderer {
             GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
             breakProgressFill.render();
         }
+        renderHotbar(width);
         GL11.glDepthMask(true);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
+    }
+
+    private void renderHotbar(int width) {
+        float aspectScale = (float) window.getHeight() / width;
+        float totalWidth = HOTBAR_SLOT_COUNT * HOTBAR_SLOT_SIZE + (HOTBAR_SLOT_COUNT - 1) * HOTBAR_SLOT_GAP;
+        float left = -totalWidth * 0.5f;
+        float top = HOTBAR_BOTTOM + HOTBAR_SLOT_SIZE;
+        for (int slot = 0; slot < HOTBAR_SLOT_COUNT; slot++) {
+            float slotLeft = left + slot * (HOTBAR_SLOT_SIZE + HOTBAR_SLOT_GAP);
+            float centerX = slotLeft + HOTBAR_SLOT_SIZE * 0.5f;
+            float centerY = HOTBAR_BOTTOM + HOTBAR_SLOT_SIZE * 0.5f;
+            modelMatrix.identity()
+                    .translation(centerX * aspectScale, centerY, 0.0f)
+                    .scale(HOTBAR_SLOT_SIZE * aspectScale, HOTBAR_SLOT_SIZE, 1.0f);
+            GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+            hotbarSlotBackground.render();
+
+            if (slot == selectedHotbarSlot) {
+                modelMatrix.identity()
+                        .translation(centerX * aspectScale, centerY, 0.0f)
+                        .scale(HOTBAR_SLOT_SIZE * aspectScale, HOTBAR_SLOT_SIZE, 1.0f);
+                GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+                GL11.glLineWidth(2.0f);
+                hotbarSelection.render();
+                GL11.glLineWidth(1.0f);
+            }
+
+            renderDigit(slot == 9 ? 0 : slot + 1, (slotLeft + 0.017f) * aspectScale,
+                    top - 0.018f, 0.018f * aspectScale, 0.026f);
+
+            BlockType block = hotbarBlocks[slot];
+            if (block != null) {
+                float iconSize = 0.038f;
+                modelMatrix.identity()
+                        .translation((centerX - iconSize * 0.5f) * aspectScale,
+                                centerY - iconSize * 0.5f, 0.025f)
+                        .scale(iconSize * aspectScale, iconSize, iconSize);
+                GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+                droppedBlockMeshes.get(block).render();
+                if (hotbarCounts[slot] > 0) {
+                    renderCount(hotbarCounts[slot], (slotLeft + HOTBAR_SLOT_SIZE - 0.008f) * aspectScale,
+                            HOTBAR_BOTTOM + 0.014f, aspectScale);
+                }
+            }
+        }
+    }
+
+    private void renderCount(int count, float right, float centerY, float aspectScale) {
+        String digits = Integer.toString(count);
+        float digitWidth = 0.012f;
+        float digitHeight = 0.020f;
+        float gap = 0.001f;
+        float totalWidth = digits.length() * digitWidth + (digits.length() - 1) * gap;
+        float start = right - totalWidth * aspectScale;
+        for (int index = 0; index < digits.length(); index++) {
+            int digit = digits.charAt(index) - '0';
+            renderDigit(digit, start + (index * (digitWidth + gap) + digitWidth * 0.5f) * aspectScale,
+                    centerY, digitWidth * aspectScale, digitHeight);
+        }
+    }
+
+    private void renderDigit(int digit, float centerX, float centerY, float width, float height) {
+        modelMatrix.identity().translation(centerX, centerY, 0.0f).scale(width, height, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        digitMeshes.get(digit).render();
     }
 
     private static float[] createBlockOutline() {
@@ -274,6 +365,69 @@ public class Renderer {
         return vertices;
     }
 
+    private static float[] createRectangleOutline() {
+        float[] points = {
+            -0.5f, -0.5f, 0.5f, -0.5f,
+            0.5f, -0.5f, 0.5f, 0.5f,
+            0.5f, 0.5f, -0.5f, 0.5f,
+            -0.5f, 0.5f, -0.5f, -0.5f
+        };
+        float[] vertices = new float[points.length / 2 * 6];
+        for (int vertex = 0; vertex < points.length / 2; vertex++) {
+            int pointOffset = vertex * 2;
+            int vertexOffset = vertex * 6;
+            vertices[vertexOffset] = points[pointOffset];
+            vertices[vertexOffset + 1] = points[pointOffset + 1];
+            vertices[vertexOffset + 2] = 0.025f;
+            vertices[vertexOffset + 3] = 1.0f;
+            vertices[vertexOffset + 4] = 0.85f;
+            vertices[vertexOffset + 5] = 0.12f;
+        }
+        return vertices;
+    }
+
+    private static float[] createDigit(int digit) {
+        boolean[][] segments = {
+            {true, true, true, true, true, true, false},
+            {false, true, true, false, false, false, false},
+            {true, true, false, true, true, false, true},
+            {true, true, true, true, false, false, true},
+            {false, true, true, false, false, true, true},
+            {true, false, true, true, false, true, true},
+            {true, false, true, true, true, true, true},
+            {true, true, true, false, false, false, false},
+            {true, true, true, true, true, true, true},
+            {true, true, true, true, false, true, true}
+        };
+        float[][] endpoints = {
+            {-0.38f, 0.45f, 0.38f, 0.45f},
+            {0.38f, 0.45f, 0.38f, 0.04f},
+            {0.38f, -0.04f, 0.38f, -0.45f},
+            {-0.38f, -0.45f, 0.38f, -0.45f},
+            {-0.38f, -0.04f, -0.38f, -0.45f},
+            {-0.38f, 0.45f, -0.38f, 0.04f},
+            {-0.38f, 0.0f, 0.38f, 0.0f}
+        };
+        float[] vertices = new float[7 * 2 * 6];
+        int vertex = 0;
+        for (int segment = 0; segment < 7; segment++) {
+            if (!segments[digit][segment]) {
+                continue;
+            }
+            for (int point = 0; point < 2; point++) {
+                int endpointOffset = point * 2;
+                int vertexOffset = vertex++ * 6;
+                vertices[vertexOffset] = endpoints[segment][endpointOffset];
+                vertices[vertexOffset + 1] = endpoints[segment][endpointOffset + 1];
+                vertices[vertexOffset + 2] = 0.025f;
+                vertices[vertexOffset + 3] = 1.0f;
+                vertices[vertexOffset + 4] = 1.0f;
+                vertices[vertexOffset + 5] = 1.0f;
+            }
+        }
+        return java.util.Arrays.copyOf(vertices, vertex * 6);
+    }
+
     public void shutdown() {
         for (Mesh mesh : chunkMeshes.values()) {
             mesh.close();
@@ -298,6 +452,16 @@ public class Renderer {
         if (breakProgressFill != null) {
             breakProgressFill.close();
         }
+        if (hotbarSlotBackground != null) {
+            hotbarSlotBackground.close();
+        }
+        if (hotbarSelection != null) {
+            hotbarSelection.close();
+        }
+        for (Mesh mesh : digitMeshes.values()) {
+            mesh.close();
+        }
+        digitMeshes.clear();
         if (shader != null) {
             shader.close();
         }

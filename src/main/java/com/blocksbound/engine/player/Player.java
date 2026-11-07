@@ -96,6 +96,10 @@ public class Player {
         return new Vector3f(position);
     }
 
+    public boolean isGrounded() {
+        return grounded;
+    }
+
     public void addToInventory(BlockType type, int amount) {
         if (type == null || !type.isSolid() || amount <= 0) {
             throw new IllegalArgumentException("Inventory additions require a solid block and positive amount");
@@ -105,6 +109,22 @@ public class Player {
 
     public int getInventoryCount(BlockType type) {
         return inventory.getOrDefault(type, 0);
+    }
+
+    public boolean removeFromInventory(BlockType type, int amount) {
+        if (type == null || !type.isSolid() || amount <= 0) {
+            throw new IllegalArgumentException("Inventory removals require a solid block and positive amount");
+        }
+        int available = getInventoryCount(type);
+        if (available < amount) {
+            return false;
+        }
+        if (available == amount) {
+            inventory.remove(type);
+        } else {
+            inventory.put(type, available - amount);
+        }
+        return true;
     }
 
     public Map<BlockType, Integer> getInventory() {
