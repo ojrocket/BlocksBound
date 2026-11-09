@@ -313,99 +313,6 @@ Planned systems
 - Settings
 
 ---
-
-💾 Database System
-
-JDBC will be used for persistent game information.
-
-The database is not responsible for real-time rendering or gameplay.
-
-It will primarily handle persistent information such as:
-
-Users
-Worlds
-Players
-Inventory
-Player Statistics
-Game Progress
-Save Metadata
-
-Possible structure:
-
-users
-  │
-  └── worlds
-         │
-         └── player_data
-                │
-                ├── inventory
-                ├── statistics
-                └── progress
-
-The exact schema will evolve during development.
-
----
-
-🗂️ Planned Project Structure
-
-VoxelGame/
-│
-├── src/
-│   └── main/
-│       ├── java/
-│       │   └── com/jashwanth/voxel/
-│       │       │
-│       │       ├── Main.java
-│       │       │
-│       │       ├── engine/
-│       │       │   ├── Engine.java
-│       │       │   ├── Window.java
-│       │       │   ├── Time.java
-│       │       │   └── Input.java
-│       │       │
-│       │       ├── rendering/
-│       │       │   ├── Renderer.java
-│       │       │   ├── Shader.java
-│       │       │   ├── Mesh.java
-│       │       │   ├── Texture.java
-│       │       │   └── Camera.java
-│       │       │
-│       │       ├── world/
-│       │       │   ├── World.java
-│       │       │   ├── Chunk.java
-│       │       │   ├── Block.java
-│       │       │   ├── BlockType.java
-│       │       │   └── ChunkMesh.java
-│       │       │
-│       │       ├── entity/
-│       │       │   ├── Entity.java
-│       │       │   ├── Player.java
-│       │       │   └── Mob.java
-│       │       │
-│       │       ├── game/
-│       │       │   ├── Inventory.java
-│       │       │   ├── Crafting.java
-│       │       │   └── GameState.java
-│       │       │
-│       │       └── database/
-│       │           ├── Database.java
-│       │           ├── PlayerDAO.java
-│       │           └── WorldDAO.java
-│       │
-│       └── resources/
-│           ├── shaders/
-│           ├── textures/
-│           ├── sounds/
-│           └── assets/
-│
-├── docs/
-├── saves/
-├── README.md
-├── build.gradle
-└── settings.gradle
-
-This structure is a starting point and may change as the architecture develops.
-
 📏 Project Scope
 
 The project will prioritize quality over quantity.
@@ -464,43 +371,6 @@ Optimization should be based on profiling rather than assumptions.
 
 ---
 
-🔀 Git & Development Rules
-
-Branch structure
-
-main
-│
-├── develop
-│
-├── feature/engine
-├── feature/world-generation
-├── feature/player
-├── feature/inventory
-└── feature/ui-database
-
-Rules
-
-1. "main" should remain stable.
-2. Do not directly commit unfinished features to "main".
-3. Each feature should have its own branch.
-4. Commits should describe what actually changed.
-5. Test before opening a pull request.
-6. Do not commit passwords, API keys, database credentials, or private files.
-7. Avoid modifying another developer's core system without discussion.
-8. Engine APIs should be documented before other systems depend on them.
-
-Example commits
-
-feat: add OpenGL window initialization
-feat: implement first-person camera
-feat: add voxel chunk storage
-feat: implement chunk mesh generation
-feat: add procedural terrain generation
-fix: resolve chunk boundary rendering issue
-perf: optimize visible face generation
-
----
-
 📚 Engineering Principles
 
 1. Build incrementally
@@ -533,28 +403,7 @@ Measure performance first.
 
 6. Protect the engine
 
-The engine is the foundation of the game. Changes to core rendering/world systems should be reviewed carefully.
-
----
-
-📖 Documentation
-
-Documentation will be maintained in:
-
-docs/
-
-Planned documentation:
-
-docs/
-├── architecture.md
-├── engine.md
-├── rendering.md
-├── voxel-world.md
-├── terrain-generation.md
-├── physics.md
-├── entities.md
-├── database.md
-└── development-log.md
+The engine is the foundation of the game. Changes to core rendering/world systems should be reviewed carefully
 
 ---
 
