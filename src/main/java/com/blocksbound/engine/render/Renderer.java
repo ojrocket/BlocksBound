@@ -20,8 +20,8 @@ import org.lwjgl.opengl.GL20;
 public class Renderer {
     private static final int HOTBAR_SLOT_COUNT = 10;
     private static final float HOTBAR_SLOT_SIZE = 0.105f;
-    private static final float HOTBAR_SLOT_GAP = 0.008f;
-    private static final float HOTBAR_BOTTOM = -0.94f;
+    private static final float HOTBAR_SLOT_GAP = 0.006f;
+    private static final float HOTBAR_BOTTOM = -0.93f;
 
     private final Window window;
     private final Camera camera = new Camera();
@@ -35,7 +35,10 @@ public class Renderer {
     private Mesh crosshairOutline;
     private Mesh breakProgressBackground;
     private Mesh breakProgressFill;
+    private Mesh hotbarPanel;
     private Mesh hotbarSlotBackground;
+    private Mesh hotbarSelectedBackground;
+    private Mesh hotbarSlotBorder;
     private Mesh hotbarSelection;
     private BlockType[] hotbarBlocks = new BlockType[HOTBAR_SLOT_COUNT];
     private int[] hotbarCounts = new int[HOTBAR_SLOT_COUNT];
@@ -95,9 +98,14 @@ public class Renderer {
                 0.08f, 0.08f, 0.08f));
         breakProgressFill = new Mesh(createBar(-0.035f, -0.028f, 0.035f, -0.022f,
                 0.35f, 0.9f, 0.3f));
+        hotbarPanel = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f,
+                0.035f, 0.045f, 0.06f));
         hotbarSlotBackground = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f,
-                0.12f, 0.12f, 0.12f));
-        hotbarSelection = new Mesh(createRectangleOutline(), GL11.GL_LINES);
+                0.12f, 0.15f, 0.18f));
+        hotbarSelectedBackground = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f,
+                0.28f, 0.22f, 0.09f));
+        hotbarSlotBorder = new Mesh(createRectangleOutline(0.36f, 0.42f, 0.48f), GL11.GL_LINES);
+        hotbarSelection = new Mesh(createRectangleOutline(1.0f, 0.78f, 0.22f), GL11.GL_LINES);
         for (int digit = 0; digit <= 9; digit++) {
             digitMeshes.put(digit, new Mesh(createDigit(digit), GL11.GL_LINES));
         }
@@ -237,6 +245,14 @@ public class Renderer {
         float totalWidth = HOTBAR_SLOT_COUNT * HOTBAR_SLOT_SIZE + (HOTBAR_SLOT_COUNT - 1) * HOTBAR_SLOT_GAP;
         float left = -totalWidth * 0.5f;
         float top = HOTBAR_BOTTOM + HOTBAR_SLOT_SIZE;
+        float panelWidth = totalWidth + 0.026f;
+        float panelHeight = HOTBAR_SLOT_SIZE + 0.032f;
+        modelMatrix.identity()
+                .translation(0.0f, HOTBAR_BOTTOM + HOTBAR_SLOT_SIZE * 0.5f, 0.0f)
+                .scale(panelWidth * aspectScale, panelHeight, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        hotbarPanel.render();
+
         for (int slot = 0; slot < HOTBAR_SLOT_COUNT; slot++) {
             float slotLeft = left + slot * (HOTBAR_SLOT_SIZE + HOTBAR_SLOT_GAP);
             float centerX = slotLeft + HOTBAR_SLOT_SIZE * 0.5f;
@@ -245,7 +261,13 @@ public class Renderer {
                     .translation(centerX * aspectScale, centerY, 0.0f)
                     .scale(HOTBAR_SLOT_SIZE * aspectScale, HOTBAR_SLOT_SIZE, 1.0f);
             GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
-            hotbarSlotBackground.render();
+            (slot == selectedHotbarSlot ? hotbarSelectedBackground : hotbarSlotBackground).render();
+
+            modelMatrix.identity()
+                    .translation(centerX * aspectScale, centerY, 0.0f)
+                    .scale(HOTBAR_SLOT_SIZE * aspectScale, HOTBAR_SLOT_SIZE, 1.0f);
+            GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+            hotbarSlotBorder.render();
 
             if (slot == selectedHotbarSlot) {
                 modelMatrix.identity()
@@ -261,7 +283,7 @@ public class Renderer {
                     top - 0.018f, 0.018f * aspectScale, 0.026f);
 
             BlockType block = hotbarBlocks[slot];
-            if (block != null) {
+            if (block != null && hotbarCounts[slot] > 0) {
                 float iconSize = 0.038f;
                 modelMatrix.identity()
                         .translation((centerX - iconSize * 0.5f) * aspectScale,
@@ -269,19 +291,18 @@ public class Renderer {
                         .scale(iconSize * aspectScale, iconSize, iconSize);
                 GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
                 droppedBlockMeshes.get(block).render();
-                if (hotbarCounts[slot] > 0) {
-                    renderCount(hotbarCounts[slot], (slotLeft + HOTBAR_SLOT_SIZE - 0.008f) * aspectScale,
-                            HOTBAR_BOTTOM + 0.014f, aspectScale);
-                }
+                renderCount(hotbarCounts[slot], (slotLeft + HOTBAR_SLOT_SIZE - 0.008f) * aspectScale,
+                        HOTBAR_BOTTOM + 0.014f, aspectScale);
             }
         }
     }
 
     private void renderCount(int count, float right, float centerY, float aspectScale) {
         String digits = Integer.toString(count);
-        float digitWidth = 0.012f;
-        float digitHeight = 0.020f;
         float gap = 0.001f;
+        float digitWidth = Math.min(0.012f,
+                (HOTBAR_SLOT_SIZE * 0.82f - (digits.length() - 1) * gap) / digits.length());
+        float digitHeight = 0.020f * (digitWidth / 0.012f);
         float totalWidth = digits.length() * digitWidth + (digits.length() - 1) * gap;
         float start = right - totalWidth * aspectScale;
         for (int index = 0; index < digits.length(); index++) {
@@ -365,7 +386,7 @@ public class Renderer {
         return vertices;
     }
 
-    private static float[] createRectangleOutline() {
+    private static float[] createRectangleOutline(float red, float green, float blue) {
         float[] points = {
             -0.5f, -0.5f, 0.5f, -0.5f,
             0.5f, -0.5f, 0.5f, 0.5f,
@@ -379,9 +400,9 @@ public class Renderer {
             vertices[vertexOffset] = points[pointOffset];
             vertices[vertexOffset + 1] = points[pointOffset + 1];
             vertices[vertexOffset + 2] = 0.025f;
-            vertices[vertexOffset + 3] = 1.0f;
-            vertices[vertexOffset + 4] = 0.85f;
-            vertices[vertexOffset + 5] = 0.12f;
+            vertices[vertexOffset + 3] = red;
+            vertices[vertexOffset + 4] = green;
+            vertices[vertexOffset + 5] = blue;
         }
         return vertices;
     }
@@ -452,8 +473,17 @@ public class Renderer {
         if (breakProgressFill != null) {
             breakProgressFill.close();
         }
+        if (hotbarPanel != null) {
+            hotbarPanel.close();
+        }
         if (hotbarSlotBackground != null) {
             hotbarSlotBackground.close();
+        }
+        if (hotbarSelectedBackground != null) {
+            hotbarSelectedBackground.close();
+        }
+        if (hotbarSlotBorder != null) {
+            hotbarSlotBorder.close();
         }
         if (hotbarSelection != null) {
             hotbarSelection.close();

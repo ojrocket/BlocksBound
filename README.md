@@ -71,7 +71,7 @@ The project should demonstrate practical knowledge of:
 
 The current build implements the first playable voxel-world loop:
 
-- Deterministic, seeded terrain generated into 16 × 64 × 16 chunks as the player explores.
+- Deterministic, seeded terrain generated into 16 × 64 × 16 chunks as the player explores, with rolling lowlands, mountain ridges, and procedurally placed trees.
 - Chunk meshes include only faces exposed to air or water; edits refresh the affected chunk meshes.
 - First-person WASD movement with mouse look, gravity, jumping, and block collision.
 - Locally synthesized sound effects for jumping, breaking and placing blocks, and collecting drops.

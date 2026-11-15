@@ -25,6 +25,32 @@ class WorldSystemsTest {
     }
 
     @Test
+    void terrainGenerationIncludesTreesAndMountainPeaks() {
+        boolean foundWood = false;
+        boolean foundLeaves = false;
+        for (int chunkX = -6; chunkX <= 6 && !(foundWood && foundLeaves); chunkX++) {
+            for (int chunkZ = -6; chunkZ <= 6 && !(foundWood && foundLeaves); chunkZ++) {
+                Chunk chunk = TerrainGenerator.generate(1234L, chunkX, chunkZ);
+                for (short block : chunk.copyBlocks()) {
+                    foundWood |= (block & 0xFFFF) == BlockType.WOOD.getId();
+                    foundLeaves |= (block & 0xFFFF) == BlockType.LEAVES.getId();
+                }
+            }
+        }
+
+        int maximumHeight = 0;
+        for (int worldX = -512; worldX <= 512; worldX += 8) {
+            for (int worldZ = -512; worldZ <= 512; worldZ += 8) {
+                maximumHeight = Math.max(maximumHeight, TerrainGenerator.heightAt(1234L, worldX, worldZ));
+            }
+        }
+
+        assertTrue(foundWood, "Generated terrain should contain tree trunks");
+        assertTrue(foundLeaves, "Generated terrain should contain tree canopies");
+        assertTrue(maximumHeight >= 40, "Generated terrain should include mountain-height peaks");
+    }
+
+    @Test
     void chunkMesherEmitsOnlyExposedFaces() {
         World world = new World(5L);
         Chunk chunk = new Chunk();

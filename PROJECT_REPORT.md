@@ -19,7 +19,7 @@ The project addresses the problem of building a playable voxel sandbox from the 
 ## 4. Objectives of the Project
 
 - Build a Java 21 application with a custom game engine and a real-time game loop.
-- Generate deterministic terrain from a world seed and organize it into 16 × 64 × 16 chunks.
+- Generate deterministic terrain from a world seed, including mountain ridges and trees, and organize it into 16 × 64 × 16 chunks.
 - Render the visible voxel terrain using LWJGL and OpenGL, rebuilding chunk meshes when edits make them stale.
 - Support first-person mouse look, WASD movement, sprinting, jumping, gravity, and block collision.
 - Let players target, break, collect, select, and place solid blocks.
@@ -173,7 +173,7 @@ The project uses Gradle and JUnit 5. The automated test suite covers:
 
 - Engine configuration validation.
 - Player collision behavior.
-- Seeded terrain generation and world systems, including chunk meshing, negative-coordinate chunk borders, raycasting, block drops and pickups, and save/load.
+- Seeded terrain generation, mountain heights and tree placement, plus world systems including chunk meshing, negative-coordinate chunk borders, raycasting, block drops and pickups, and save/load.
 - Block-break progress behavior.
 
 These tests exercise core logic without replacing manual testing of the actual OpenGL window, visual rendering, audio output, or end-to-end play on a compatible system. Run the tests with `.\gradlew.bat test`. The build targets Java 21; run the game with `.\gradlew.bat run`.
