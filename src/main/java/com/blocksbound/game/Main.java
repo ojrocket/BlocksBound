@@ -51,6 +51,7 @@ public class Main implements Game {
     private int selectedHotbarSlot = 1;
     private int lastChunkX = Integer.MIN_VALUE;
     private int lastChunkZ = Integer.MIN_VALUE;
+    private boolean debugCoordinatesVisible;
 
     public Main() {
         this.engine = new Engine(EngineConfig.defaults(), this);
@@ -104,6 +105,9 @@ public class Main implements Game {
         if (input.wasKeyPressed(GLFW.GLFW_KEY_F9)) {
             loadWorld();
         }
+        if (input.wasKeyPressed(GLFW.GLFW_KEY_F3)) {
+            debugCoordinatesVisible = !debugCoordinatesVisible;
+        }
 
         selectHotbarSlot();
 
@@ -126,6 +130,7 @@ public class Main implements Game {
 
     @Override
     public void render() {
+        renderer.setDebugCoordinates(debugCoordinatesVisible, player.getPosition());
         int centerX = Math.floorDiv((int) Math.floor(camera.getPosition().x), Chunk.SIZE);
         int centerZ = Math.floorDiv((int) Math.floor(camera.getPosition().z), Chunk.SIZE);
         Optional<BlockHit> targetedBlock = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);

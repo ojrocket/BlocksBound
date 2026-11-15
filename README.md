@@ -77,7 +77,7 @@ The current build implements the first playable voxel-world loop:
 - Locally synthesized sound effects for jumping, breaking and placing blocks, and collecting drops.
 - A centered crosshair and outline highlight the block being targeted; hold the left mouse button for 0.5 seconds to break one block, then release before breaking another, or use the right mouse button to place the selected block.
 - Number keys 1–6 select grass, dirt, stone, sand, wood, or leaves.
-- F5 saves the world and player position; F9 loads the save; Escape exits (and saves on shutdown).
+- F3 toggles the on-screen player-coordinate display; F5 saves the world and player position; F9 loads the save; Escape exits (and saves on shutdown).
 - Saves are stored locally at `.blocksbound/world.dat` under the user's home directory. This binary save is the current persistence implementation; JDBC/MySQL remains a future project goal.
 
 ---

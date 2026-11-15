@@ -154,6 +154,7 @@ BlocksBound is a real-time 3D game, not a Swing or JavaFX form-based application
 | Hold left mouse button for 0.5 seconds | Break one targeted block; release before breaking another |
 | Right mouse button | Place the selected block if it is available in inventory |
 | 1–6 | Select grass, dirt, stone, sand, wood, or leaves |
+| F3 | Toggle the on-screen player coordinates |
 | F5 / F9 | Save / load |
 | Escape | Exit; save on shutdown |
 

@@ -14,6 +14,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 
@@ -29,6 +30,8 @@ public class Renderer {
     private final Map<Long, Mesh> chunkMeshes = new HashMap<>();
     private final Map<BlockType, Mesh> droppedBlockMeshes = new EnumMap<>(BlockType.class);
     private final Map<Integer, Mesh> digitMeshes = new HashMap<>();
+    private final Map<Character, Mesh> debugGlyphMeshes = new HashMap<>();
+    private final Vector3f debugPosition = new Vector3f();
     private Shader shader;
     private Mesh blockHighlight;
     private Mesh crosshair;
@@ -48,6 +51,7 @@ public class Renderer {
     private int modelLocation;
     private float breakProgress;
     private World renderedWorld;
+    private boolean debugCoordinatesVisible;
 
     public Renderer(Window window) {
         this.window = window;
@@ -109,6 +113,26 @@ public class Renderer {
         for (int digit = 0; digit <= 9; digit++) {
             digitMeshes.put(digit, new Mesh(createDigit(digit), GL11.GL_LINES));
         }
+        debugGlyphMeshes.put('-', new Mesh(createLineGlyph(new float[] {
+            -0.5f, 0.0f, 0.5f, 0.0f
+        }, 1.0f, 1.0f, 1.0f), GL11.GL_LINES));
+        debugGlyphMeshes.put('.', new Mesh(createLineGlyph(new float[] {
+            -0.08f, -0.42f, 0.08f, -0.42f
+        }, 1.0f, 1.0f, 1.0f), GL11.GL_LINES));
+        debugGlyphMeshes.put('X', new Mesh(createLineGlyph(new float[] {
+            -0.42f, 0.45f, 0.42f, -0.45f,
+            -0.42f, -0.45f, 0.42f, 0.45f
+        }, 1.0f, 0.34f, 0.30f), GL11.GL_LINES));
+        debugGlyphMeshes.put('Y', new Mesh(createLineGlyph(new float[] {
+            -0.42f, 0.45f, 0.0f, 0.0f,
+            0.42f, 0.45f, 0.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, -0.45f
+        }, 0.40f, 1.0f, 0.45f), GL11.GL_LINES));
+        debugGlyphMeshes.put('Z', new Mesh(createLineGlyph(new float[] {
+            -0.42f, 0.45f, 0.42f, 0.45f,
+            0.42f, 0.45f, -0.42f, -0.45f,
+            -0.42f, -0.45f, 0.42f, -0.45f
+        }, 0.38f, 0.65f, 1.0f), GL11.GL_LINES));
     }
 
     public void render(Game game, float alpha) {
@@ -200,6 +224,13 @@ public class Renderer {
         return camera;
     }
 
+    public void setDebugCoordinates(boolean visible, Vector3f position) {
+        debugCoordinatesVisible = visible;
+        if (visible) {
+            debugPosition.set(position);
+        }
+    }
+
     private void renderBlockHighlight(BlockHit hit) {
         shader.use();
         float expansion = 0.003f;
@@ -235,9 +266,66 @@ public class Renderer {
             GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
             breakProgressFill.render();
         }
+        if (debugCoordinatesVisible) {
+            renderDebugCoordinates(width);
+        }
         renderHotbar(width);
         GL11.glDepthMask(true);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
+    }
+
+    private void renderDebugCoordinates(int width) {
+        float aspectScale = (float) window.getHeight() / width;
+        float panelWidth = 0.58f;
+        float panelHeight = 0.205f;
+        float margin = 0.018f * aspectScale;
+        float left = -1.0f + margin;
+        float top = 0.96f;
+        float panelCenterX = left + panelWidth * aspectScale * 0.5f;
+        float panelCenterY = top - panelHeight * 0.5f;
+        modelMatrix.identity().translation(panelCenterX, panelCenterY, 0.0f)
+                .scale(panelWidth * aspectScale, panelHeight, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        hotbarPanel.render();
+
+        float labelX = left + 0.035f * aspectScale;
+        float valueX = left + 0.095f * aspectScale;
+        float rowTop = top - 0.047f;
+        float rowGap = 0.060f;
+        String[] coordinates = {
+            String.format(java.util.Locale.ROOT, "%.1f", debugPosition.x),
+            String.format(java.util.Locale.ROOT, "%.1f", debugPosition.y),
+            String.format(java.util.Locale.ROOT, "%.1f", debugPosition.z)
+        };
+        char[] axes = {'X', 'Y', 'Z'};
+        for (int row = 0; row < axes.length; row++) {
+            float centerY = rowTop - row * rowGap;
+            renderDebugGlyph(axes[row], labelX, centerY, 0.025f * aspectScale, 0.030f);
+            renderDebugText(coordinates[row], valueX, centerY, 0.018f, 0.030f, aspectScale);
+        }
+    }
+
+    private void renderDebugText(String text, float startX, float centerY,
+            float characterWidth, float characterHeight, float aspectScale) {
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            float x = startX + (index + 0.5f) * characterWidth * aspectScale;
+            if (Character.isDigit(character)) {
+                renderDigit(character - '0', x, centerY, characterWidth * aspectScale, characterHeight);
+            } else {
+                renderDebugGlyph(character, x, centerY, characterWidth * aspectScale, characterHeight);
+            }
+        }
+    }
+
+    private void renderDebugGlyph(char character, float centerX, float centerY, float width, float height) {
+        Mesh glyph = debugGlyphMeshes.get(character);
+        if (glyph == null) {
+            throw new IllegalArgumentException("Unsupported debug text character: " + character);
+        }
+        modelMatrix.identity().translation(centerX, centerY, 0.0f).scale(width, height, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        glyph.render();
     }
 
     private void renderHotbar(int width) {
@@ -449,6 +537,21 @@ public class Renderer {
         return java.util.Arrays.copyOf(vertices, vertex * 6);
     }
 
+    private static float[] createLineGlyph(float[] points, float red, float green, float blue) {
+        float[] vertices = new float[points.length / 2 * 6];
+        for (int point = 0; point < points.length / 2; point++) {
+            int vertexOffset = point * 6;
+            int pointOffset = point * 2;
+            vertices[vertexOffset] = points[pointOffset];
+            vertices[vertexOffset + 1] = points[pointOffset + 1];
+            vertices[vertexOffset + 2] = 0.025f;
+            vertices[vertexOffset + 3] = red;
+            vertices[vertexOffset + 4] = green;
+            vertices[vertexOffset + 5] = blue;
+        }
+        return vertices;
+    }
+
     public void shutdown() {
         for (Mesh mesh : chunkMeshes.values()) {
             mesh.close();
@@ -492,6 +595,10 @@ public class Renderer {
             mesh.close();
         }
         digitMeshes.clear();
+        for (Mesh mesh : debugGlyphMeshes.values()) {
+            mesh.close();
+        }
+        debugGlyphMeshes.clear();
         if (shader != null) {
             shader.close();
         }
