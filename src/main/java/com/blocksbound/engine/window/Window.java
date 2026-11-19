@@ -4,6 +4,7 @@ import java.nio.IntBuffer;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWFramebufferSizeCallback;
 import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.opengl.GL11;
@@ -17,6 +18,11 @@ public class Window implements AutoCloseable {
     private final GLFWErrorCallback errorCallback;
     private final GLFWFramebufferSizeCallback framebufferSizeCallback;
     private final GLCapabilities caps;
+    private boolean fullscreen;
+    private int windowedWidth;
+    private int windowedHeight;
+    private int windowedX;
+    private int windowedY;
 
     public Window(String title, int width, int height, boolean vsync) {
         this.title = title;
@@ -42,6 +48,15 @@ public class Window implements AutoCloseable {
         }
 
         GLFW.glfwMakeContextCurrent(handle);
+        windowedWidth = width;
+        windowedHeight = height;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer windowX = stack.mallocInt(1);
+            IntBuffer windowY = stack.mallocInt(1);
+            GLFW.glfwGetWindowPos(handle, windowX, windowY);
+            windowedX = windowX.get(0);
+            windowedY = windowY.get(0);
+        }
         GLFW.glfwSwapInterval(vsync ? 1 : 0);
         GLFW.glfwShowWindow(handle);
         caps = GL.createCapabilities();
@@ -98,6 +113,36 @@ public class Window implements AutoCloseable {
 
     public void setTitle(String title) {
         GLFW.glfwSetWindowTitle(handle, title);
+    }
+
+    public boolean isFullscreen() {
+        return fullscreen;
+    }
+
+    public void toggleFullscreen() {
+        if (fullscreen) {
+            GLFW.glfwSetWindowMonitor(handle, 0L, windowedX, windowedY,
+                    windowedWidth, windowedHeight, GLFW.GLFW_DONT_CARE);
+            fullscreen = false;
+            return;
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer windowX = stack.mallocInt(1);
+            IntBuffer windowY = stack.mallocInt(1);
+            GLFW.glfwGetWindowPos(handle, windowX, windowY);
+            windowedX = windowX.get(0);
+            windowedY = windowY.get(0);
+        }
+        windowedWidth = width;
+        windowedHeight = height;
+        long monitor = GLFW.glfwGetPrimaryMonitor();
+        GLFWVidMode videoMode = GLFW.glfwGetVideoMode(monitor);
+        if (videoMode == null) {
+            throw new IllegalStateException("Could not determine the primary monitor video mode");
+        }
+        GLFW.glfwSetWindowMonitor(handle, monitor, 0, 0, videoMode.width(), videoMode.height(),
+                videoMode.refreshRate());
+        fullscreen = true;
     }
 
     @Override

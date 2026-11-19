@@ -25,6 +25,12 @@ import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 
 public class Main implements Game {
+    private enum Screen {
+        TITLE,
+        PLAYING,
+        PAUSED
+    }
+
     private static final int LOAD_RADIUS = 5;
     private static final int RENDER_RADIUS = 4;
     private static final float REACH = 6.0f;
@@ -52,6 +58,8 @@ public class Main implements Game {
     private int lastChunkX = Integer.MIN_VALUE;
     private int lastChunkZ = Integer.MIN_VALUE;
     private boolean debugCoordinatesVisible;
+    private Screen screen = Screen.TITLE;
+    private String titleMessage = "";
 
     public Main() {
         this.engine = new Engine(EngineConfig.defaults(), this);
@@ -62,42 +70,33 @@ public class Main implements Game {
 
     @Override
     public void init() {
-        Optional<SavedWorld> saved;
-        try {
-            saved = WorldStorage.load(savePath);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Could not load world save at " + savePath, exception);
-        }
-
-        if (saved.isPresent()) {
-            world = saved.get().world();
-            world.ensureChunksAround((int) Math.floor(saved.get().playerPosition().x),
-                    (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
-            player = new Player(world, camera, input);
-            player.setPosition(saved.get().playerPosition());
-            saved.get().inventory().forEach(player::addToInventory);
-        } else {
-            world = new World();
-            world.ensureChunksAround(0, 0, LOAD_RADIUS);
-            player = new Player(world, camera, input);
-            player.setPosition(new Vector3f(0.5f, world.getSurfaceHeight(0, 0) + 2.62f, 0.5f));
-        }
-
         try {
             soundEffects = new SoundEffects();
         } catch (LineUnavailableException | IllegalArgumentException exception) {
             System.err.println("Sound effects are unavailable: " + exception.getMessage());
         }
 
-        input.setCursorMode(GLFW.GLFW_CURSOR_DISABLED);
-        input.setCursorPosition(engine.getWindow().getWidth() / 2.0, engine.getWindow().getHeight() / 2.0);
-        updateWindowTitle();
+        input.setCursorMode(GLFW.GLFW_CURSOR_NORMAL);
+        engine.getWindow().setTitle("BlocksBound");
     }
 
     @Override
     public void update(float deltaSeconds) {
+        if (input.wasKeyPressed(GLFW.GLFW_KEY_F11)) {
+            engine.getWindow().toggleFullscreen();
+        }
+        if (screen == Screen.TITLE) {
+            updateTitleScreen();
+            return;
+        }
+        if (screen == Screen.PAUSED) {
+            updatePauseScreen();
+            return;
+        }
         if (input.wasKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
-            engine.getWindow().setWindowShouldClose(true);
+            screen = Screen.PAUSED;
+            input.setCursorMode(GLFW.GLFW_CURSOR_NORMAL);
+            return;
         }
         if (input.wasKeyPressed(GLFW.GLFW_KEY_F5)) {
             saveWorld();
@@ -130,12 +129,22 @@ public class Main implements Game {
 
     @Override
     public void render() {
+        if (screen == Screen.TITLE) {
+            renderer.renderTitleScreen(titleMessage, hasSavedWorld());
+            return;
+        }
+        if (world == null || player == null) {
+            return;
+        }
         renderer.setDebugCoordinates(debugCoordinatesVisible, player.getPosition());
         int centerX = Math.floorDiv((int) Math.floor(camera.getPosition().x), Chunk.SIZE);
         int centerZ = Math.floorDiv((int) Math.floor(camera.getPosition().z), Chunk.SIZE);
         Optional<BlockHit> targetedBlock = Raycaster.cast(world, camera.getPosition(), camera.getFront(), REACH);
         renderer.renderWorld(world, centerX, centerZ, RENDER_RADIUS, targetedBlock,
                 blockBreakProgress.getProgress(), HOTBAR_BLOCKS, getHotbarCounts(), selectedHotbarSlot);
+        if (screen == Screen.PAUSED) {
+            renderer.renderPauseScreen();
+        }
     }
 
     @Override
@@ -158,6 +167,7 @@ public class Main implements Game {
             blockBreakProgress.update(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT), null, deltaSeconds);
             return;
         }
+
         BlockHit target = hit.get();
         if (blockBreakProgress.update(input.isMouseButtonDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
                 target, deltaSeconds)) {
@@ -165,6 +175,7 @@ public class Main implements Game {
                 playSound(Sound.BLOCK_BREAK);
             }
         }
+
         BlockType selectedBlock = HOTBAR_BLOCKS[selectedHotbarSlot];
         if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
                 && selectedBlock != null
@@ -176,6 +187,91 @@ public class Main implements Game {
             playSound(Sound.BLOCK_PLACE);
             updateWindowTitle();
         }
+    }
+
+    private void updateTitleScreen() {
+        if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+            double x = input.getMouseX() / engine.getWindow().getWidth() * 2.0 - 1.0;
+            double y = 1.0 - input.getMouseY() / engine.getWindow().getHeight() * 2.0;
+            if (renderer.isButtonHovered(x, y, 0.05f)) {
+                startNewWorld();
+            } else if (renderer.isButtonHovered(x, y, -0.10f)) {
+                rejoinWorld();
+            } else if (renderer.isButtonHovered(x, y, -0.25f)) {
+                engine.getWindow().toggleFullscreen();
+            } else if (renderer.isButtonHovered(x, y, -0.40f)) {
+                engine.getWindow().setWindowShouldClose(true);
+            }
+        }
+    }
+
+    private void updatePauseScreen() {
+        if (input.wasKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
+            resumeGame();
+            return;
+        }
+        if (!input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+            return;
+        }
+        double x = input.getMouseX() / engine.getWindow().getWidth() * 2.0 - 1.0;
+        double y = 1.0 - input.getMouseY() / engine.getWindow().getHeight() * 2.0;
+        if (renderer.isButtonHovered(x, y, 0.20f)) {
+            resumeGame();
+        } else if (renderer.isButtonHovered(x, y, 0.05f)) {
+            saveWorld();
+            screen = Screen.TITLE;
+            input.setCursorMode(GLFW.GLFW_CURSOR_NORMAL);
+        } else if (renderer.isButtonHovered(x, y, -0.10f)) {
+            saveWorld();
+            engine.getWindow().setWindowShouldClose(true);
+        } else if (renderer.isButtonHovered(x, y, -0.25f)) {
+            engine.getWindow().setWindowShouldClose(true);
+        }
+    }
+
+    private void startNewWorld() {
+        world = new World();
+        world.ensureChunksAround(0, 0, LOAD_RADIUS);
+        player = new Player(world, camera, input);
+        player.setPosition(new Vector3f(0.5f, world.getSurfaceHeight(0, 0) + 2.62f, 0.5f));
+        lastChunkX = Integer.MIN_VALUE;
+        lastChunkZ = Integer.MIN_VALUE;
+        titleMessage = "";
+        resumeGame();
+    }
+
+    private void rejoinWorld() {
+        try {
+            Optional<SavedWorld> saved = WorldStorage.load(savePath);
+            if (saved.isEmpty()) {
+                titleMessage = "NO SAVED WORLD";
+                return;
+            }
+            world = saved.get().world();
+            player = new Player(world, camera, input);
+            player.setPosition(saved.get().playerPosition());
+            saved.get().inventory().forEach(player::addToInventory);
+            world.ensureChunksAround((int) Math.floor(saved.get().playerPosition().x),
+                    (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
+            lastChunkX = Integer.MIN_VALUE;
+            lastChunkZ = Integer.MIN_VALUE;
+            titleMessage = "";
+            resumeGame();
+        } catch (IOException exception) {
+            titleMessage = "LOAD FAILED";
+            System.err.println("Could not load world from " + savePath + ": " + exception.getMessage());
+        }
+    }
+
+    private boolean hasSavedWorld() {
+        return java.nio.file.Files.exists(savePath);
+    }
+
+    private void resumeGame() {
+        screen = Screen.PLAYING;
+        input.setCursorMode(GLFW.GLFW_CURSOR_DISABLED);
+        input.setCursorPosition(engine.getWindow().getWidth() / 2.0, engine.getWindow().getHeight() / 2.0);
+        updateWindowTitle();
     }
 
     private void selectHotbarSlot() {

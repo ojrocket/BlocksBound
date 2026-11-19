@@ -156,7 +156,8 @@ BlocksBound is a real-time 3D game, not a Swing or JavaFX form-based application
 | 1–6 | Select grass, dirt, stone, sand, wood, or leaves |
 | F3 | Toggle the on-screen player coordinates |
 | F5 / F9 | Save / load |
-| Escape | Exit; save on shutdown |
+| Escape | Open the in-game pause menu; Escape again resumes |
+| F11 | Toggle fullscreen |
 
 ## 9. Database Connectivity
 
@@ -183,4 +184,4 @@ These tests exercise core logic without replacing manual testing of the actual O
 
 BlocksBound currently demonstrates a playable core for a Java voxel sandbox: procedural chunked terrain, first-person movement and collision, block interaction, inventory, audio effects, OpenGL rendering, and local world persistence. The modular engine/game structure also provides a foundation for extending the project.
 
-Potential future work includes adding biomes, textures, crafting, enemies and health, a menu and settings flow, JDBC-backed persistence, and expanded automated and manual testing. These are future enhancements and are not represented as completed features in this report.
+Potential future work includes adding biomes, textures, crafting, enemies and health, JDBC-backed persistence, and expanded automated and manual testing. The title screen, local world rejoin flow, fullscreen toggle, and in-game pause menu are implemented in the current build. These are future enhancements and are not represented as completed features in this report.

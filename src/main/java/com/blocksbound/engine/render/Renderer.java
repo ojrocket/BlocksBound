@@ -31,6 +31,7 @@ public class Renderer {
     private final Map<BlockType, Mesh> droppedBlockMeshes = new EnumMap<>(BlockType.class);
     private final Map<Integer, Mesh> digitMeshes = new HashMap<>();
     private final Map<Character, Mesh> debugGlyphMeshes = new HashMap<>();
+    private final Map<Character, Mesh> fontMeshes = new HashMap<>();
     private final Vector3f debugPosition = new Vector3f();
     private Shader shader;
     private Mesh blockHighlight;
@@ -43,6 +44,9 @@ public class Renderer {
     private Mesh hotbarSelectedBackground;
     private Mesh hotbarSlotBorder;
     private Mesh hotbarSelection;
+    private Mesh uiPanel;
+    private Mesh uiButton;
+    private Mesh uiButtonHover;
     private BlockType[] hotbarBlocks = new BlockType[HOTBAR_SLOT_COUNT];
     private int[] hotbarCounts = new int[HOTBAR_SLOT_COUNT];
     private int selectedHotbarSlot;
@@ -52,6 +56,7 @@ public class Renderer {
     private float breakProgress;
     private World renderedWorld;
     private boolean debugCoordinatesVisible;
+    private boolean hudVisible;
 
     public Renderer(Window window) {
         this.window = window;
@@ -113,6 +118,12 @@ public class Renderer {
         for (int digit = 0; digit <= 9; digit++) {
             digitMeshes.put(digit, new Mesh(createDigit(digit), GL11.GL_LINES));
         }
+        for (char character : "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray()) {
+            fontMeshes.put(character, new Mesh(createFontGlyph(character), GL11.GL_TRIANGLES));
+        }
+        uiPanel = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.035f, 0.045f, 0.06f));
+        uiButton = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.12f, 0.15f, 0.18f));
+        uiButtonHover = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.25f, 0.32f, 0.40f));
         debugGlyphMeshes.put('-', new Mesh(createLineGlyph(new float[] {
             -0.5f, 0.0f, 0.5f, 0.0f
         }, 1.0f, 1.0f, 1.0f), GL11.GL_LINES));
@@ -149,7 +160,9 @@ public class Renderer {
         GL20.glUniformMatrix4fv(projectionLocation, false, camera.getProjectionMatrix().get(new float[16]));
         GL20.glUniformMatrix4fv(viewLocation, false, camera.getViewMatrix().get(new float[16]));
         game.render();
-        renderCrosshair(width, height, breakProgress);
+        if (hudVisible) {
+            renderCrosshair(width, height, breakProgress);
+        }
     }
 
     public void renderWorld(World world, int centerChunkX, int centerChunkZ, int renderRadius,
@@ -159,6 +172,7 @@ public class Renderer {
                 || selectedHotbarSlot < 0 || selectedHotbarSlot >= HOTBAR_SLOT_COUNT) {
             throw new IllegalArgumentException("Hotbar must contain ten slots and a valid selection");
         }
+
         this.breakProgress = Math.max(0.0f, Math.min(1.0f, breakProgress));
         this.hotbarBlocks = hotbarBlocks.clone();
         this.hotbarCounts = hotbarCounts.clone();
@@ -218,10 +232,86 @@ public class Renderer {
             droppedBlockMeshes.get(drop.type()).render();
         }
         highlightedBlock.ifPresent(this::renderBlockHighlight);
+        hudVisible = true;
+    }
+
+    public void renderTitleScreen(String message, boolean hasSavedWorld) {
+        hudVisible = false;
+        renderUiBackground();
+        renderText("BLOCKSBOUND", 0.0f, 0.76f, 0.060f);
+        renderButton("NEW WORLD", 0.05f, false);
+        renderButton("REJOIN WORLD", -0.10f, false);
+        renderButton("FULLSCREEN", -0.25f, false);
+        renderButton("QUIT GAME", -0.40f, false);
+        if (!hasSavedWorld) {
+            renderText("NO SAVED WORLD", 0.0f, -0.54f, 0.026f);
+        } else if (!message.isBlank()) {
+            renderText(message, 0.0f, -0.54f, 0.026f);
+        }
+    }
+
+    public void renderPauseScreen() {
+        hudVisible = false;
+        renderUiBackground();
+        renderText("PAUSED", 0.0f, 0.50f, 0.055f);
+        renderButton("RESUME", 0.20f, false);
+        renderButton("RETURN TO TITLE SCREEN", 0.05f, false);
+        renderButton("SAVE AND QUIT", -0.10f, false);
+        renderButton("QUIT GAME", -0.25f, false);
+    }
+
+    public boolean isButtonHovered(double x, double y, float centerY) {
+        return x >= -0.36 && x <= 0.36 && y >= centerY - 0.055 && y <= centerY + 0.055;
     }
 
     public Camera getCamera() {
         return camera;
+    }
+
+    private void renderUiBackground() {
+        shader.use();
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(false);
+        GL20.glUniformMatrix4fv(projectionLocation, false, new Matrix4f().get(new float[16]));
+        GL20.glUniformMatrix4fv(viewLocation, false, new Matrix4f().get(new float[16]));
+        modelMatrix.identity().scale(1.0f, 1.0f, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        uiPanel.render();
+    }
+
+    private void renderButton(String label, float centerY, boolean hovered) {
+        float aspectScale = (float) window.getHeight() / window.getWidth();
+        modelMatrix.identity().translation(0.0f, centerY, 0.0f)
+                .scale(0.72f * aspectScale, 0.11f, 1.0f);
+        GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+        (hovered ? uiButtonHover : uiButton).render();
+        renderText(label, 0.0f, centerY - 0.022f, 0.021f);
+    }
+
+    private void renderText(String text, float centerX, float centerY, float height) {
+        float aspectScale = (float) window.getHeight() / window.getWidth();
+        float characterWidth = height * 5.0f / 7.0f;
+        float gap = height * 0.35f;
+        float totalWidth = 0.0f;
+        for (int index = 0; index < text.length(); index++) {
+            totalWidth += text.charAt(index) == ' ' ? characterWidth * 0.65f : characterWidth;
+            if (index + 1 < text.length()) {
+                totalWidth += gap;
+            }
+        }
+        float x = centerX - totalWidth * 0.5f;
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            float width = character == ' ' ? characterWidth * 0.65f : characterWidth;
+            if (character != ' ') {
+                Mesh glyph = fontMeshes.get(character);
+                modelMatrix.identity().translation((x + width * 0.5f) * aspectScale, centerY, 0.1f)
+                        .scale(width * aspectScale / 5.0f, height / 7.0f, 1.0f);
+                GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
+                glyph.render();
+            }
+            x += width + gap;
+        }
     }
 
     public void setDebugCoordinates(boolean visible, Vector3f position) {
@@ -552,6 +642,65 @@ public class Renderer {
         return vertices;
     }
 
+    private static float[] createFontGlyph(char character) {
+        String[] rows = switch (character) {
+            case 'A' -> new String[] {"01110", "10001", "10001", "11111", "10001", "10001", "10001"};
+            case 'B' -> new String[] {"11110", "10001", "10001", "11110", "10001", "10001", "11110"};
+            case 'C' -> new String[] {"01111", "10000", "10000", "10000", "10000", "10000", "01111"};
+            case 'D' -> new String[] {"11110", "10001", "10001", "10001", "10001", "10001", "11110"};
+            case 'E' -> new String[] {"11111", "10000", "10000", "11110", "10000", "10000", "11111"};
+            case 'F' -> new String[] {"11111", "10000", "10000", "11110", "10000", "10000", "10000"};
+            case 'G' -> new String[] {"01111", "10000", "10000", "10111", "10001", "10001", "01111"};
+            case 'H' -> new String[] {"10001", "10001", "10001", "11111", "10001", "10001", "10001"};
+            case 'I' -> new String[] {"11111", "00100", "00100", "00100", "00100", "00100", "11111"};
+            case 'J' -> new String[] {"00111", "00010", "00010", "00010", "00010", "10010", "01100"};
+            case 'K' -> new String[] {"10001", "10010", "10100", "11000", "10100", "10010", "10001"};
+            case 'L' -> new String[] {"10000", "10000", "10000", "10000", "10000", "10000", "11111"};
+            case 'M' -> new String[] {"10001", "11011", "10101", "10101", "10001", "10001", "10001"};
+            case 'N' -> new String[] {"10001", "11001", "10101", "10011", "10001", "10001", "10001"};
+            case 'O' -> new String[] {"01110", "10001", "10001", "10001", "10001", "10001", "01110"};
+            case 'P' -> new String[] {"11110", "10001", "10001", "11110", "10000", "10000", "10000"};
+            case 'Q' -> new String[] {"01110", "10001", "10001", "10001", "10101", "10010", "01101"};
+            case 'R' -> new String[] {"11110", "10001", "10001", "11110", "10100", "10010", "10001"};
+            case 'S' -> new String[] {"01111", "10000", "10000", "01110", "00001", "00001", "11110"};
+            case 'T' -> new String[] {"11111", "00100", "00100", "00100", "00100", "00100", "00100"};
+            case 'U' -> new String[] {"10001", "10001", "10001", "10001", "10001", "10001", "01110"};
+            case 'V' -> new String[] {"10001", "10001", "10001", "10001", "10001", "01010", "00100"};
+            case 'W' -> new String[] {"10001", "10001", "10001", "10101", "10101", "11011", "10001"};
+            case 'X' -> new String[] {"10001", "10001", "01010", "00100", "01010", "10001", "10001"};
+            case 'Y' -> new String[] {"10001", "10001", "01010", "00100", "00100", "00100", "00100"};
+            case 'Z' -> new String[] {"11111", "00001", "00010", "00100", "01000", "10000", "11111"};
+            default -> new String[] {"11111", "10001", "10011", "10101", "11001", "10001", "11111"};
+        };
+        float[] vertices = new float[rows.length * 5 * 6 * 6];
+        int vertex = 0;
+        for (int row = 0; row < rows.length; row++) {
+            for (int column = 0; column < rows[row].length(); column++) {
+                if (rows[row].charAt(column) != '1') {
+                    continue;
+                }
+                float left = column;
+                float right = column + 1.0f;
+                float top = 7.0f - row;
+                float bottom = top - 1.0f;
+                float[][] points = {
+                    {left, bottom}, {right, bottom}, {right, top},
+                    {left, bottom}, {right, top}, {left, top}
+                };
+                for (float[] point : points) {
+                    int offset = vertex++ * 6;
+                    vertices[offset] = point[0];
+                    vertices[offset + 1] = point[1];
+                    vertices[offset + 2] = 0.1f;
+                    vertices[offset + 3] = 0.95f;
+                    vertices[offset + 4] = 0.95f;
+                    vertices[offset + 5] = 1.0f;
+                }
+            }
+        }
+        return java.util.Arrays.copyOf(vertices, vertex * 6);
+    }
+
     public void shutdown() {
         for (Mesh mesh : chunkMeshes.values()) {
             mesh.close();
@@ -599,6 +748,19 @@ public class Renderer {
             mesh.close();
         }
         debugGlyphMeshes.clear();
+        for (Mesh mesh : fontMeshes.values()) {
+            mesh.close();
+        }
+        fontMeshes.clear();
+        if (uiPanel != null) {
+            uiPanel.close();
+        }
+        if (uiButton != null) {
+            uiButton.close();
+        }
+        if (uiButtonHover != null) {
+            uiButtonHover.close();
+        }
         if (shader != null) {
             shader.close();
         }

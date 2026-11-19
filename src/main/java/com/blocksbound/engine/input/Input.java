@@ -87,6 +87,14 @@ public class Input {
         return mouseDeltaY;
     }
 
+    public double getMouseX() {
+        return mouseX;
+    }
+
+    public double getMouseY() {
+        return mouseY;
+    }
+
     public void setCursorMode(int cursorMode) {
         GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_CURSOR, cursorMode);
     }
