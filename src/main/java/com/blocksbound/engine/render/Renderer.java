@@ -2,10 +2,10 @@ package com.blocksbound.engine.render;
 
 import com.blocksbound.engine.core.Game;
 import com.blocksbound.engine.window.Window;
+import com.blocksbound.engine.world.BlockDrop;
+import com.blocksbound.engine.world.BlockHit;
 import com.blocksbound.engine.world.Chunk;
 import com.blocksbound.engine.world.ChunkMesher;
-import com.blocksbound.engine.world.BlockHit;
-import com.blocksbound.engine.world.BlockDrop;
 import com.blocksbound.engine.world.BlockType;
 import com.blocksbound.engine.world.World;
 import java.util.EnumMap;
@@ -46,7 +46,6 @@ public class Renderer {
     private Mesh hotbarSelection;
     private Mesh uiPanel;
     private Mesh uiButton;
-    private Mesh uiButtonHover;
     private BlockType[] hotbarBlocks = new BlockType[HOTBAR_SLOT_COUNT];
     private int[] hotbarCounts = new int[HOTBAR_SLOT_COUNT];
     private int selectedHotbarSlot;
@@ -123,7 +122,6 @@ public class Renderer {
         }
         uiPanel = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.035f, 0.045f, 0.06f));
         uiButton = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.12f, 0.15f, 0.18f));
-        uiButtonHover = new Mesh(createBar(-0.5f, -0.5f, 0.5f, 0.5f, 0.25f, 0.32f, 0.40f));
         debugGlyphMeshes.put('-', new Mesh(createLineGlyph(new float[] {
             -0.5f, 0.0f, 0.5f, 0.0f
         }, 1.0f, 1.0f, 1.0f), GL11.GL_LINES));
@@ -239,28 +237,30 @@ public class Renderer {
         hudVisible = false;
         renderUiBackground();
         renderText("BLOCKSBOUND", 0.0f, 0.76f, 0.060f);
-        renderButton("NEW WORLD", 0.05f, false);
-        renderButton("REJOIN WORLD", -0.10f, false);
-        renderButton("FULLSCREEN", -0.25f, false);
-        renderButton("QUIT GAME", -0.40f, false);
+        renderButton("NEW WORLD", 0.05f);
+        renderButton("REJOIN WORLD", -0.10f);
+        renderButton("FULLSCREEN", -0.25f);
+        renderButton("QUIT GAME", -0.40f);
         if (!hasSavedWorld) {
             renderText("NO SAVED WORLD", 0.0f, -0.54f, 0.026f);
         } else if (!message.isBlank()) {
             renderText(message, 0.0f, -0.54f, 0.026f);
         }
+        finishUiOverlay();
     }
 
     public void renderPauseScreen() {
         hudVisible = false;
         renderUiBackground();
         renderText("PAUSED", 0.0f, 0.50f, 0.055f);
-        renderButton("RESUME", 0.20f, false);
-        renderButton("RETURN TO TITLE SCREEN", 0.05f, false);
-        renderButton("SAVE AND QUIT", -0.10f, false);
-        renderButton("QUIT GAME", -0.25f, false);
+        renderButton("RESUME", 0.20f);
+        renderButton("RETURN TO TITLE SCREEN", 0.05f);
+        renderButton("SAVE AND QUIT", -0.10f);
+        renderButton("QUIT GAME", -0.25f);
+        finishUiOverlay();
     }
 
-    public boolean isButtonHovered(double x, double y, float centerY) {
+    public boolean isPointerOverButton(double x, double y, float centerY) {
         return x >= -0.36 && x <= 0.36 && y >= centerY - 0.055 && y <= centerY + 0.055;
     }
 
@@ -279,13 +279,18 @@ public class Renderer {
         uiPanel.render();
     }
 
-    private void renderButton(String label, float centerY, boolean hovered) {
+    private void renderButton(String label, float centerY) {
         float aspectScale = (float) window.getHeight() / window.getWidth();
         modelMatrix.identity().translation(0.0f, centerY, 0.0f)
                 .scale(0.72f * aspectScale, 0.11f, 1.0f);
         GL20.glUniformMatrix4fv(modelLocation, false, modelMatrix.get(new float[16]));
-        (hovered ? uiButtonHover : uiButton).render();
+        uiButton.render();
         renderText(label, 0.0f, centerY - 0.022f, 0.021f);
+    }
+
+    private void finishUiOverlay() {
+        GL11.glDepthMask(true);
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
     }
 
     private void renderText(String text, float centerX, float centerY, float height) {
@@ -757,9 +762,6 @@ public class Renderer {
         }
         if (uiButton != null) {
             uiButton.close();
-        }
-        if (uiButtonHover != null) {
-            uiButtonHover.close();
         }
         if (shader != null) {
             shader.close();
