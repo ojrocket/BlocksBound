@@ -1,0 +1,57 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Test and package the game
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          .\gradlew.bat test packageWindowsAppImage "-PreleaseVersion=$version"
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $archive = "build\distributions\BlocksBound-$version-windows.zip"
+          New-Item -ItemType Directory -Force "build\distributions" | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Resolve-Path "build\jpackage\BlocksBound").Path,
+            (Join-Path $PWD $archive))
+          @"
+          ## Install
+
+          1. Download and extract **BlocksBound-$version-windows.zip**.
+          2. Keep the extracted files together.
+          3. Double-click **BlocksBound.exe** to play. The ZIP includes the Java runtime.
+          "@ | Set-Content -Path "build\distributions\release-notes.md" -Encoding utf8
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          gh release create $env:GITHUB_REF_NAME `
+            "build\distributions\BlocksBound-$version-windows.zip" `
+            --title "BlocksBound $version" `
+            --notes-file "build\distributions\release-notes.md"

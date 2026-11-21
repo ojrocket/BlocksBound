@@ -78,6 +78,7 @@ tasks.register('packageWindowsAppImage', Exec) {
         }
 
         def outputDirectory = layout.buildDirectory.dir('jpackage').get().asFile
+        def appVersion = providers.gradleProperty('releaseVersion').getOrElse(project.version.toString())
         delete new File(outputDirectory, 'BlocksBound')
         outputDirectory.mkdirs()
         commandLine jpackageExecutable.absolutePath,
@@ -87,7 +88,7 @@ tasks.register('packageWindowsAppImage', Exec) {
                 '--name', 'BlocksBound',
                 '--main-jar', "${project.name}-${project.version}.jar",
                 '--main-class', 'com.blocksbound.game.Main',
-                '--app-version', project.version.toString(),
+                '--app-version', appVersion,
                 '--vendor', 'BlocksBound'
     }
 }

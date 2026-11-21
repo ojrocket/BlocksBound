@@ -85,6 +85,10 @@ The current build implements the first playable voxel-world loop:
 
 On Windows with a full JDK installed, run `.\gradlew.bat packageWindowsAppImage`. The app image is created at `build\jpackage\BlocksBound`; launch `BlocksBound.exe` inside that folder. Keep the whole folder together when moving or sharing the game because it includes the app files and bundled Java runtime.
 
+### Download and play
+
+Download the latest `BlocksBound-*-windows.zip` from the [GitHub Releases](https://github.com/ojrocket/BlocksBound/releases) page. Extract the ZIP, keep its files together, and double-click `BlocksBound.exe`.
+
 ---
 
 🏗️ High-Level Architecture
