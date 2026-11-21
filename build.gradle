@@ -62,3 +62,32 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('packageWindowsAppImage', Exec) {
+    group = 'distribution'
+    description = 'Build a standalone Windows app image with a bundled Java runtime.'
+    dependsOn tasks.named('installDist')
+
+    doFirst {
+        if (!osName.contains('win')) {
+            throw new GradleException('The Windows app image can only be packaged on Windows.')
+        }
+        def jpackageExecutable = new File(System.getProperty('java.home'), 'bin/jpackage.exe')
+        if (!jpackageExecutable.isFile()) {
+            throw new GradleException('A full JDK with jpackage is required to package the Windows app.')
+        }
+
+        def outputDirectory = layout.buildDirectory.dir('jpackage').get().asFile
+        delete new File(outputDirectory, 'BlocksBound')
+        outputDirectory.mkdirs()
+        commandLine jpackageExecutable.absolutePath,
+                '--type', 'app-image',
+                '--input', layout.buildDirectory.dir('install/BlocksBound/lib').get().asFile.absolutePath,
+                '--dest', outputDirectory.absolutePath,
+                '--name', 'BlocksBound',
+                '--main-jar', "${project.name}-${project.version}.jar",
+                '--main-class', 'com.blocksbound.game.Main',
+                '--app-version', project.version.toString(),
+                '--vendor', 'BlocksBound'
+    }
+}

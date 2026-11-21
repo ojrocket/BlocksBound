@@ -81,6 +81,10 @@ The current build implements the first playable voxel-world loop:
 - F3 toggles the on-screen player-coordinate display; F5 saves the world and player position; F9 loads the save; F11 toggles fullscreen.
 - Saves are stored locally at `.blocksbound/world.dat` under the user's home directory. This binary save is the current persistence implementation; JDBC/MySQL remains a future project goal.
 
+### Build a standalone Windows app
+
+On Windows with a full JDK installed, run `.\gradlew.bat packageWindowsAppImage`. The app image is created at `build\jpackage\BlocksBound`; launch `BlocksBound.exe` inside that folder. Keep the whole folder together when moving or sharing the game because it includes the app files and bundled Java runtime.
+
 ---
 
 🏗️ High-Level Architecture
