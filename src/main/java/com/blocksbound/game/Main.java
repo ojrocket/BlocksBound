@@ -18,6 +18,8 @@ import com.blocksbound.engine.world.World;
 import com.blocksbound.engine.world.WorldStorage;
 import com.blocksbound.engine.world.WorldStorage.SavedWorld;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import javax.sound.sampled.LineUnavailableException;
@@ -49,7 +51,7 @@ public class Main implements Game {
     private final Camera camera;
     private final Input input;
     private final Renderer renderer;
-    private final java.nio.file.Path savePath = WorldStorage.defaultSavePath();
+    private final Path savePath = WorldStorage.defaultSavePath();
     private World world;
     private Player player;
     private SoundEffects soundEffects;
@@ -190,18 +192,14 @@ public class Main implements Game {
     }
 
     private void updateTitleScreen() {
-        if (input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
-            double x = input.getMouseX() / engine.getWindow().getWidth() * 2.0 - 1.0;
-            double y = 1.0 - input.getMouseY() / engine.getWindow().getHeight() * 2.0;
-            if (renderer.isButtonHovered(x, y, 0.05f)) {
-                startNewWorld();
-            } else if (renderer.isButtonHovered(x, y, -0.10f)) {
-                rejoinWorld();
-            } else if (renderer.isButtonHovered(x, y, -0.25f)) {
-                engine.getWindow().toggleFullscreen();
-            } else if (renderer.isButtonHovered(x, y, -0.40f)) {
-                engine.getWindow().setWindowShouldClose(true);
-            }
+        if (isMenuButtonClicked(0.05f)) {
+            startNewWorld();
+        } else if (isMenuButtonClicked(-0.10f)) {
+            rejoinWorld();
+        } else if (isMenuButtonClicked(-0.25f)) {
+            engine.getWindow().toggleFullscreen();
+        } else if (isMenuButtonClicked(-0.40f)) {
+            engine.getWindow().setWindowShouldClose(true);
         }
     }
 
@@ -210,23 +208,27 @@ public class Main implements Game {
             resumeGame();
             return;
         }
-        if (!input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
-            return;
-        }
-        double x = input.getMouseX() / engine.getWindow().getWidth() * 2.0 - 1.0;
-        double y = 1.0 - input.getMouseY() / engine.getWindow().getHeight() * 2.0;
-        if (renderer.isButtonHovered(x, y, 0.20f)) {
+        if (isMenuButtonClicked(0.20f)) {
             resumeGame();
-        } else if (renderer.isButtonHovered(x, y, 0.05f)) {
+        } else if (isMenuButtonClicked(0.05f)) {
             saveWorld();
             screen = Screen.TITLE;
             input.setCursorMode(GLFW.GLFW_CURSOR_NORMAL);
-        } else if (renderer.isButtonHovered(x, y, -0.10f)) {
+        } else if (isMenuButtonClicked(-0.10f)) {
             saveWorld();
             engine.getWindow().setWindowShouldClose(true);
-        } else if (renderer.isButtonHovered(x, y, -0.25f)) {
+        } else if (isMenuButtonClicked(-0.25f)) {
             engine.getWindow().setWindowShouldClose(true);
         }
+    }
+
+    private boolean isMenuButtonClicked(float centerY) {
+        if (!input.wasMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT)) {
+            return false;
+        }
+        double x = input.getMouseX() / engine.getWindow().getWidth() * 2.0 - 1.0;
+        double y = 1.0 - input.getMouseY() / engine.getWindow().getHeight() * 2.0;
+        return renderer.isPointerOverButton(x, y, centerY);
     }
 
     private void startNewWorld() {
@@ -247,14 +249,7 @@ public class Main implements Game {
                 titleMessage = "NO SAVED WORLD";
                 return;
             }
-            world = saved.get().world();
-            player = new Player(world, camera, input);
-            player.setPosition(saved.get().playerPosition());
-            saved.get().inventory().forEach(player::addToInventory);
-            world.ensureChunksAround((int) Math.floor(saved.get().playerPosition().x),
-                    (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
-            lastChunkX = Integer.MIN_VALUE;
-            lastChunkZ = Integer.MIN_VALUE;
+            restoreWorld(saved.get());
             titleMessage = "";
             resumeGame();
         } catch (IOException exception) {
@@ -264,7 +259,18 @@ public class Main implements Game {
     }
 
     private boolean hasSavedWorld() {
-        return java.nio.file.Files.exists(savePath);
+        return Files.exists(savePath);
+    }
+
+    private void restoreWorld(SavedWorld saved) {
+        world = saved.world();
+        player = new Player(world, camera, input);
+        player.setPosition(saved.playerPosition());
+        saved.inventory().forEach(player::addToInventory);
+        world.ensureChunksAround((int) Math.floor(saved.playerPosition().x),
+                (int) Math.floor(saved.playerPosition().z), LOAD_RADIUS);
+        lastChunkX = Integer.MIN_VALUE;
+        lastChunkZ = Integer.MIN_VALUE;
     }
 
     private void resumeGame() {
@@ -353,14 +359,7 @@ public class Main implements Game {
                 engine.getWindow().setTitle("BlocksBound | No save found");
                 return;
             }
-            world = saved.get().world();
-            player = new Player(world, camera, input);
-            player.setPosition(saved.get().playerPosition());
-            saved.get().inventory().forEach(player::addToInventory);
-            lastChunkX = Integer.MIN_VALUE;
-            lastChunkZ = Integer.MIN_VALUE;
-            world.ensureChunksAround((int) Math.floor(saved.get().playerPosition().x),
-                    (int) Math.floor(saved.get().playerPosition().z), LOAD_RADIUS);
+            restoreWorld(saved.get());
             updateWindowTitle();
         } catch (IOException exception) {
             System.err.println("Could not load world from " + savePath + ": " + exception.getMessage());
